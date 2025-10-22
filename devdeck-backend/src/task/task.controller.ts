@@ -26,12 +26,19 @@ export class TaskController {
 
   @Get()
   findAll(@Query('boardId') boardId?: string) {
-    // Filtra tarefas por boardId se o query parameter for fornecido
-    const boardIdNum = boardId ? parseInt(boardId, 10) : undefined;
-    if (boardId && isNaN(boardIdNum)) {
-      // Tratamento básico se boardId não for um número válido
-      return [];
+    let boardIdNum: number | undefined = undefined;
+
+    // Se boardId foi fornecido (não é undefined)
+    if (boardId !== undefined) {
+      boardIdNum = parseInt(boardId, 10);
+      // Agora checamos com segurança, pois boardIdNum é um 'number' (ou NaN)
+      if (isNaN(boardIdNum)) {
+        // Se não for um número válido (ex: "abc" ou ""), retorna vazio
+        return [];
+      }
     }
+
+    // Passa 'undefined' (se nada foi fornecido) ou o número (se era "123")
     return this.taskService.findAll(boardIdNum);
   }
 
