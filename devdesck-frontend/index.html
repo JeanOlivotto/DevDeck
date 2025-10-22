@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DevDeck Kanban</title>
+    <!-- Inclui Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados */
+        body {
+            font-family: 'Inter', sans-serif; /* Fonte padrão do Tailwind */
+            background-color: #181c2f; /* Fundo escuro */
+            color: #e0e6ff; /* Cor de texto clara */
+        }
+        /* Estilo para placeholder de arrastar */
+        .task-placeholder {
+            background-color: rgba(67, 76, 125, 0.5); /* Fundo semi-transparente */
+            border: 2px dashed #a259ff; /* Borda tracejada roxa */
+            border-radius: 0.5rem; /* cantos arredondados */
+            min-height: 60px; /* Altura mínima */
+            margin-bottom: 0.75rem; /* Margem inferior */
+        }
+        /* Estilo sutil para a tarefa sendo arrastada */
+        .dragging {
+            opacity: 0.6;
+            transform: rotate(2deg); /* Leve rotação */
+            cursor: grabbing;
+        }
+        /* Estilos para o modal */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.6); /* Fundo escuro semi-transparente */
+        }
+        .modal-content {
+            background-color: #23284a; /* Fundo do conteúdo do modal */
+            box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4); /* Sombra */
+        }
+        .modal-input, .modal-textarea, .modal-select {
+            background-color: #1e223b; /* Fundo dos inputs */
+            border: 1px solid #3a416f; /* Borda sutil */
+            color: #e0e6ff; /* Cor do texto */
+        }
+        .modal-button {
+             background-image: linear-gradient(to right, #00eaff, #a259ff); /* Gradiente */
+             transition: all 0.3s ease; /* Transição suave */
+             box-shadow: 0 2px 8px rgba(0, 234, 255, 0.2); /* Sombra */
+        }
+         .modal-button:hover {
+             background-image: linear-gradient(to right, #a259ff, #00eaff); /* Inverte gradiente no hover */
+             transform: translateY(-2px); /* Efeito de elevação */
+             box-shadow: 0 4px 12px rgba(162, 89, 255, 0.3); /* Sombra mais forte */
+         }
+        .modal-close-button {
+             background-color: #4a517e;
+             transition: background-color 0.3s ease;
+        }
+         .modal-close-button:hover {
+             background-color: #6a719e;
+         }
+        .column-header {
+             background-image: linear-gradient(to right, #00eaff, #a259ff, #ff2d92);
+             -webkit-background-clip: text;
+             background-clip: text;
+             color: transparent;
+             text-shadow: 0 0 8px rgba(162, 89, 255, 0.3);
+             letter-spacing: 1px;
+        }
+        .task-card {
+            background: linear-gradient(135deg, #23284a 0%, #2e335a 100%);
+            border-left: 4px solid #a259ff;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            cursor: grab;
+        }
+        .task-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(162, 89, 255, 0.35);
+        }
+        .add-task-button {
+            background-image: linear-gradient(to right, #00eaff, #a259ff);
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 234, 255, 0.2);
+        }
+        .add-task-button:hover {
+            background-image: linear-gradient(to right, #a259ff, #00eaff);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(162, 89, 255, 0.3);
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen p-4 sm:p-8">
+
+    <!-- Cabeçalho -->
+    <header class="flex items-center justify-center mb-6 sm:mb-10">
+        <!-- Substitua 'logo.png' pelo caminho real do seu logo ou use um SVG/ícone -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 sm:w-16 sm:h-16 mr-4 text-purple-400 filter drop-shadow-[0_0_8px_rgba(162,89,255,0.7)]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+        <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 bg-clip-text text-transparent tracking-wide" style="text-shadow: 0 0 8px rgba(162, 89, 255, 0.4);">
+            DevDeck
+        </h1>
+    </header>
+
+    <!-- Indicador de Loading -->
+    <div id="loading-indicator" class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500"></div>
+        <p class="ml-4 text-xl text-purple-300">Carregando...</p>
+    </div>
+
+    <!-- Container Principal do Kanban -->
+    <main class="container mx-auto max-w-6xl">
+        <!-- Área de Seleção/Criação de Quadro -->
+        <div class="mb-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <label for="board-select" class="text-lg font-medium text-cyan-300">Quadro:</label>
+            <select id="board-select" class="modal-select p-2 rounded-lg text-lg min-w-[200px]">
+                <!-- Opções serão carregadas aqui -->
+            </select>
+            <button id="add-board-button" class="modal-button text-white font-semibold py-2 px-4 rounded-lg text-lg">
+                + Novo Quadro
+            </button>
+        </div>
+
+        <!-- Colunas do Kanban -->
+        <section id="kanban-board" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Coluna To Do -->
+            <div class="column bg-[#23284a] rounded-xl shadow-lg p-4 flex flex-col" data-status="TODO">
+                <h2 class="column-header text-xl font-semibold mb-4 text-center">
+                    To Do
+                </h2>
+                <div class="tasks flex-grow min-h-[100px] space-y-3" id="todo-tasks">
+                    <!-- Tarefas serão inseridas aqui -->
+                </div>
+                <button class="add-task-button text-white font-semibold py-2 px-4 rounded-lg mt-4 w-full" data-status="TODO">
+                    + Nova Tarefa
+                </button>
+            </div>
+
+            <!-- Coluna Doing -->
+            <div class="column bg-[#23284a] rounded-xl shadow-lg p-4 flex flex-col" data-status="DOING">
+                <h2 class="column-header text-xl font-semibold mb-4 text-center">
+                    Doing
+                </h2>
+                <div class="tasks flex-grow min-h-[100px] space-y-3" id="doing-tasks">
+                    <!-- Tarefas serão inseridas aqui -->
+                </div>
+                 <button class="add-task-button text-white font-semibold py-2 px-4 rounded-lg mt-4 w-full" data-status="DOING">
+                    + Nova Tarefa
+                </button>
+            </div>
+
+            <!-- Coluna Done -->
+            <div class="column bg-[#23284a] rounded-xl shadow-lg p-4 flex flex-col" data-status="DONE">
+                <h2 class="column-header text-xl font-semibold mb-4 text-center">
+                    Done
+                </h2>
+                <div class="tasks flex-grow min-h-[100px] space-y-3" id="done-tasks">
+                    <!-- Tarefas serão inseridas aqui -->
+                </div>
+                 <button class="add-task-button text-white font-semibold py-2 px-4 rounded-lg mt-4 w-full" data-status="DONE">
+                    + Nova Tarefa
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal para Adicionar/Editar Tarefa -->
+    <div id="task-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+        <div class="modal-content p-6 rounded-lg w-full max-w-md mx-4">
+            <h3 id="modal-title" class="text-xl font-semibold mb-4 text-cyan-300">Nova Tarefa</h3>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <div class="mb-4">
+                    <label for="task-title" class="block text-sm font-medium mb-1">Título:</label>
+                    <input type="text" id="task-title" name="title" class="modal-input w-full p-2 rounded" required maxlength="255">
+                </div>
+                <div class="mb-4">
+                    <label for="task-description" class="block text-sm font-medium mb-1">Descrição:</label>
+                    <textarea id="task-description" name="description" rows="3" class="modal-textarea w-full p-2 rounded" maxlength="1000"></textarea>
+                </div>
+                <div class="mb-6">
+                    <label for="task-status" class="block text-sm font-medium mb-1">Status:</label>
+                    <select id="task-status" name="status" class="modal-select w-full p-2 rounded">
+                        <option value="TODO">To Do</option>
+                        <option value="DOING">Doing</option>
+                        <option value="DONE">Done</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="modal-cancel" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="modal-save" class="modal-button text-white font-semibold py-2 px-4 rounded-lg">
+                        Salvar Tarefa
+                    </button>
+                     <button type="button" id="modal-delete" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg hidden">
+                        Excluir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+     <!-- Modal para Adicionar Quadro -->
+    <div id="board-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+        <div class="modal-content p-6 rounded-lg w-full max-w-sm mx-4">
+            <h3 class="text-xl font-semibold mb-4 text-cyan-300">Novo Quadro</h3>
+            <form id="board-form">
+                <div class="mb-6">
+                    <label for="board-name" class="block text-sm font-medium mb-1">Nome do Quadro:</label>
+                    <input type="text" id="board-name" name="name" class="modal-input w-full p-2 rounded" required maxlength="100">
+                     <p id="board-error" class="text-red-400 text-sm mt-1 hidden"></p>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="board-modal-cancel" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="board-modal-save" class="modal-button text-white font-semibold py-2 px-4 rounded-lg">
+                        Criar Quadro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Principal -->
+    <script>
+        // Configuração da API
+        const API_BASE_URL = 'http://localhost:3000/api'; // Ajuste se seu backend rodar em outra porta/URL
+
+        // Elementos do DOM
+        const boardSelect = document.getElementById('board-select');
+        const addBoardButton = document.getElementById('add-board-button');
+        const kanbanBoard = document.getElementById('kanban-board');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const taskModal = document.getElementById('task-modal');
+        const taskForm = document.getElementById('task-form');
+        const modalTitle = document.getElementById('modal-title');
+        const taskIdInput = document.getElementById('task-id');
+        const taskTitleInput = document.getElementById('task-title');
+        const taskDescriptionInput = document.getElementById('task-description');
+        const taskStatusSelect = document.getElementById('task-status');
+        const modalCancelButton = document.getElementById('modal-cancel');
+        const modalSaveButton = document.getElementById('modal-save');
+        const modalDeleteButton = document.getElementById('modal-delete');
+        const boardModal = document.getElementById('board-modal');
+        const boardForm = document.getElementById('board-form');
+        const boardNameInput = document.getElementById('board-name');
+        const boardError = document.getElementById('board-error');
+        const boardModalCancelButton = document.getElementById('board-modal-cancel');
+        const boardModalSaveButton = document.getElementById('board-modal-save');
+
+        let currentBoardId = null; // Armazena o ID do quadro selecionado
+        let draggedTaskElement = null; // Elemento da tarefa sendo arrastada
+
+        // --- Funções da API ---
+
+        async function fetchApi(endpoint, options = {}) {
+            loadingIndicator.classList.remove('hidden');
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                    ...options,
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API Error:', response.status, errorData);
+                    throw new Error(errorData.message || `Erro na API: ${response.statusText}`);
+                }
+                 // Para DELETE 204 No Content, não há corpo
+                 if (response.status === 204) {
+                     return null;
+                 }
+                return await response.json();
+            } catch (error) {
+                console.error('Erro ao buscar dados da API:', error);
+                alert(`Erro de comunicação com o servidor: ${error.message}`); // Usar um modal melhor em produção
+                throw error; // Re-lança o erro para quem chamou
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        async function getBoards() {
+            return await fetchApi('/boards');
+        }
+
+        async function createBoard(name) {
+             boardError.classList.add('hidden'); // Esconde erro anterior
+            try {
+                 return await fetchApi('/boards', {
+                    method: 'POST',
+                    body: JSON.stringify({ name }),
+                });
+            } catch (error) {
+                 if (error.message && error.message.includes('já existe')) {
+                    boardError.textContent = error.message;
+                    boardError.classList.remove('hidden');
+                } else {
+                     alert(`Erro ao criar quadro: ${error.message}`);
+                 }
+                throw error; // Re-lança para parar o fluxo
+            }
+        }
+
+        async function getTasks(boardId) {
+             if (!boardId) return []; // Retorna array vazio se não houver boardId
+            return await fetchApi(`/tasks?boardId=${boardId}`);
+        }
+
+        async function createTask(taskData) {
+            return await fetchApi('/tasks', {
+                method: 'POST',
+                body: JSON.stringify(taskData),
+            });
+        }
+
+        async function updateTask(taskId, taskData) {
+            return await fetchApi(`/tasks/${taskId}`, {
+                method: 'PATCH',
+                body: JSON.stringify(taskData),
+            });
+        }
+
+        async function deleteTask(taskId) {
+            return await fetchApi(`/tasks/${taskId}`, { method: 'DELETE' });
+        }
+
+
+        // --- Funções de Renderização ---
+
+        function renderBoards(boards) {
+            boardSelect.innerHTML = ''; // Limpa opções existentes
+            if (boards.length === 0) {
+                 const option = document.createElement('option');
+                 option.value = '';
+                 option.textContent = 'Crie um novo quadro';
+                 option.disabled = true;
+                 boardSelect.appendChild(option);
+                 currentBoardId = null;
+                 renderTasks([]); // Limpa as tarefas
+                 return;
+            }
+
+            boards.forEach(board => {
+                const option = document.createElement('option');
+                option.value = board.id;
+                option.textContent = board.name;
+                boardSelect.appendChild(option);
+            });
+
+             // Seleciona o primeiro quadro por padrão ou mantém o atual se existir
+            const selectedBoardExists = boards.some(b => b.id === currentBoardId);
+            if (!selectedBoardExists && boards.length > 0) {
+                currentBoardId = boards[0].id; // Seleciona o primeiro como padrão
+            }
+            boardSelect.value = currentBoardId; // Define o valor no select
+
+             if (currentBoardId) {
+                loadTasksForBoard(currentBoardId); // Carrega tarefas para o quadro selecionado
+            } else {
+                 renderTasks([]); // Limpa se nenhum quadro for selecionado
+             }
+        }
+
+        function renderTasks(tasks) {
+            // Limpa todas as colunas
+            document.querySelectorAll('.tasks').forEach(col => col.innerHTML = '');
+
+            if (!tasks) return; // Se não houver tarefas (ex: nenhum quadro)
+
+            tasks.forEach(task => {
+                const columnId = `${task.status.toLowerCase()}-tasks`;
+                const columnElement = document.getElementById(columnId);
+
+                if (columnElement) {
+                    const taskElement = createTaskElement(task);
+                    columnElement.appendChild(taskElement);
+                } else {
+                    console.warn(`Coluna não encontrada para status: ${task.status}`);
+                }
+            });
+
+            // Re-adiciona os event listeners de drag and drop após renderizar
+            setupDragAndDrop();
+        }
+
+        function createTaskElement(task) {
+            const div = document.createElement('div');
+            div.className = 'task-card bg-[#2e335a] rounded-lg shadow-md p-3 mb-3 cursor-grab text-white';
+            div.draggable = true;
+            div.dataset.taskId = task.id; // Armazena o ID da tarefa no elemento
+            div.dataset.status = task.status; // Armazena o status atual
+
+             const title = document.createElement('strong');
+             title.className = 'block font-semibold mb-1 truncate'; // Trunca títulos longos
+             title.textContent = task.title;
+             div.appendChild(title);
+
+             if (task.description) {
+                const desc = document.createElement('small');
+                desc.className = 'block text-gray-400 text-sm';
+                desc.textContent = task.description;
+                div.appendChild(desc);
+            }
+
+            // Adiciona listener para abrir modal ao clicar na tarefa
+            div.addEventListener('click', () => openTaskModal(task));
+
+            return div;
+        }
+
+
+        // --- Funções do Modal ---
+
+        function openTaskModal(task = null) {
+             taskForm.reset(); // Limpa o formulário
+             taskIdInput.value = ''; // Limpa ID oculto
+             modalDeleteButton.classList.add('hidden'); // Esconde botão de excluir por padrão
+
+             if (task) {
+                // Modo Edição
+                modalTitle.textContent = 'Editar Tarefa';
+                taskIdInput.value = task.id;
+                taskTitleInput.value = task.title;
+                taskDescriptionInput.value = task.description || '';
+                taskStatusSelect.value = task.status;
+                modalSaveButton.textContent = 'Salvar Alterações';
+                 modalDeleteButton.classList.remove('hidden'); // Mostra botão de excluir
+            } else {
+                // Modo Criação
+                modalTitle.textContent = 'Nova Tarefa';
+                modalSaveButton.textContent = 'Criar Tarefa';
+                // Pega o status do botão que abriu o modal (se aplicável)
+                const triggerButton = event?.target;
+                if (triggerButton && triggerButton.dataset.status) {
+                    taskStatusSelect.value = triggerButton.dataset.status;
+                } else {
+                     taskStatusSelect.value = 'TODO'; // Default para TODO
+                 }
+            }
+            taskModal.classList.remove('hidden');
+        }
+
+        function closeTaskModal() {
+            taskModal.classList.add('hidden');
+        }
+
+        async function handleTaskFormSubmit(event) {
+            event.preventDefault();
+            const id = taskIdInput.value;
+            const taskData = {
+                title: taskTitleInput.value.trim(),
+                description: taskDescriptionInput.value.trim() || null, // Envia null se vazio
+                status: taskStatusSelect.value,
+                boardId: currentBoardId, // Usa o boardId atual
+            };
+
+             // Remove o campo boardId se estiver atualizando e ele não for alterado
+             // (Não implementamos mudança de board aqui, mas seria relevante)
+             // if (id && !taskData.boardId) delete taskData.boardId;
+
+             if (!taskData.boardId) {
+                 alert('Selecione um quadro antes de criar uma tarefa.');
+                 return;
+             }
+
+            try {
+                if (id) {
+                    // Atualizar tarefa existente
+                    await updateTask(id, taskData);
+                } else {
+                    // Criar nova tarefa
+                    await createTask(taskData);
+                }
+                closeTaskModal();
+                loadTasksForBoard(currentBoardId); // Recarrega as tarefas do quadro atual
+            } catch (error) {
+                // O erro já deve ter sido mostrado pelo fetchApi
+                console.error('Falha ao salvar tarefa:', error);
+            }
+        }
+
+         async function handleDeleteTask() {
+            const id = taskIdInput.value;
+            if (!id) return;
+
+             // Simples confirmação (substituir por um modal de confirmação melhor)
+            if (confirm(`Tem certeza que deseja excluir a tarefa "${taskTitleInput.value}"?`)) {
+                try {
+                    await deleteTask(id);
+                    closeTaskModal();
+                    loadTasksForBoard(currentBoardId);
+                } catch (error) {
+                     console.error('Falha ao excluir tarefa:', error);
+                 }
+            }
+        }
+
+        // --- Funções do Modal de Quadro ---
+        function openBoardModal() {
+             boardForm.reset();
+             boardError.classList.add('hidden');
+             boardModal.classList.remove('hidden');
+             boardNameInput.focus();
+        }
+
+        function closeBoardModal() {
+            boardModal.classList.add('hidden');
+        }
+
+        async function handleBoardFormSubmit(event) {
+             event.preventDefault();
+             const name = boardNameInput.value.trim();
+             if (!name) return;
+
+             try {
+                const newBoard = await createBoard(name);
+                closeBoardModal();
+                await loadInitialData(); // Recarrega tudo
+                 // Seleciona o novo quadro
+                currentBoardId = newBoard.id;
+                boardSelect.value = currentBoardId;
+                loadTasksForBoard(currentBoardId);
+            } catch (error) {
+                 // Erro já tratado em createBoard
+             }
+        }
+
+        // --- Drag and Drop ---
+
+        function handleDragStart(event) {
+            draggedTaskElement = event.target;
+            event.dataTransfer.setData('text/plain', event.target.dataset.taskId);
+            event.dataTransfer.effectAllowed = 'move';
+            // Adiciona uma classe para feedback visual enquanto arrasta
+            setTimeout(() => event.target.classList.add('dragging'), 0);
+        }
+
+        function handleDragEnd(event) {
+            if (draggedTaskElement) {
+                draggedTaskElement.classList.remove('dragging');
+            }
+            draggedTaskElement = null;
+            // Remove placeholders se houver algum
+            document.querySelectorAll('.task-placeholder').forEach(p => p.remove());
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault(); // Necessário para permitir o drop
+            event.dataTransfer.dropEffect = 'move';
+
+             const column = event.target.closest('.column');
+             if (!column || !draggedTaskElement) return;
+
+             const tasksContainer = column.querySelector('.tasks');
+             const placeholder = tasksContainer.querySelector('.task-placeholder');
+
+             // Cria placeholder se não existir na coluna atual
+             if (!placeholder) {
+                 // Remove de outras colunas
+                 document.querySelectorAll('.task-placeholder').forEach(p => p.remove());
+                 const newPlaceholder = document.createElement('div');
+                 newPlaceholder.className = 'task-placeholder';
+                 // Insere o placeholder na posição correta
+                 const afterElement = getDragAfterElement(tasksContainer, event.clientY);
+                 if (afterElement == null) {
+                    tasksContainer.appendChild(newPlaceholder);
+                } else {
+                    tasksContainer.insertBefore(newPlaceholder, afterElement);
+                }
+             } else {
+                  // Move o placeholder existente dentro da coluna
+                 const afterElement = getDragAfterElement(tasksContainer, event.clientY);
+                 if (afterElement !== placeholder.nextSibling) { // Otimização para evitar movimentos desnecessários
+                    if (afterElement == null) {
+                        tasksContainer.appendChild(placeholder);
+                    } else {
+                         tasksContainer.insertBefore(placeholder, afterElement);
+                    }
+                }
+             }
+
+        }
+
+        // Função auxiliar para determinar onde inserir o placeholder/tarefa
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+
+             return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                 // Distância do centro do elemento até o cursor
+                const offset = y - box.top - box.height / 2;
+                 // Se o cursor está abaixo do centro e mais perto que o 'closest' atual
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                 } else {
+                    return closest;
+                 }
+            }, { offset: Number.NEGATIVE_INFINITY }).element; // Inicia com offset "infinito negativo"
+        }
+
+
+        function handleDragEnter(event) {
+             event.preventDefault(); // Necessário em alguns navegadores
+             const column = event.target.closest('.column');
+             if (column) {
+                // Adicionar algum feedback visual se desejar (ex: borda na coluna)
+            }
+        }
+
+        function handleDragLeave(event) {
+            const column = event.target.closest('.column');
+            // Remove placeholder se sair da área de tarefas ou da coluna
+            if (column) {
+                 const tasksContainer = column.querySelector('.tasks');
+                 // Verifica se o elemento relacionado (para onde o mouse foi) ainda está dentro da área de tarefas
+                 if (!tasksContainer.contains(event.relatedTarget)) {
+                     const placeholder = tasksContainer.querySelector('.task-placeholder');
+                     if(placeholder) placeholder.remove();
+                 }
+            }
+        }
+
+
+        async function handleDrop(event) {
+            event.preventDefault();
+            const column = event.target.closest('.column');
+            const placeholder = column?.querySelector('.task-placeholder');
+
+            if (!column || !draggedTaskElement || !placeholder) {
+                 if (draggedTaskElement) draggedTaskElement.classList.remove('dragging');
+                 draggedTaskElement = null;
+                 document.querySelectorAll('.task-placeholder').forEach(p => p.remove());
+                 return; // Sai se não soltar em uma coluna válida ou não houver tarefa/placeholder
+            }
+
+            const taskId = draggedTaskElement.dataset.taskId;
+            const newStatus = column.dataset.status;
+            const oldStatus = draggedTaskElement.dataset.status;
+
+            // Remove o placeholder e insere a tarefa arrastada
+            const tasksContainer = column.querySelector('.tasks');
+            tasksContainer.insertBefore(draggedTaskElement, placeholder);
+            placeholder.remove(); // Remove o placeholder após soltar
+
+             draggedTaskElement.classList.remove('dragging'); // Remove estilo de arrastar
+             draggedTaskElement.dataset.status = newStatus; // Atualiza o status no elemento
+             draggedTaskElement = null; // Limpa a referência
+
+            // Atualiza no backend apenas se o status mudou
+            if (newStatus !== oldStatus) {
+                try {
+                    await updateTask(taskId, { status: newStatus });
+                    console.log(`Tarefa ${taskId} movida para ${newStatus}`);
+                    // Opcional: Recarregar tarefas para garantir consistência total,
+                    // mas a manipulação do DOM já atualizou visualmente.
+                    // loadTasksForBoard(currentBoardId);
+                } catch (error) {
+                    console.error('Falha ao atualizar status da tarefa:', error);
+                    // Reverter a mudança visual em caso de erro
+                     alert('Erro ao mover a tarefa. Recarregando...');
+                     loadTasksForBoard(currentBoardId); // Recarrega para corrigir
+                }
+            }
+        }
+
+        function setupDragAndDrop() {
+            const tasks = document.querySelectorAll('.task-card');
+            const columns = document.querySelectorAll('.column .tasks'); // Seleciona os containers de tarefas
+
+            tasks.forEach(task => {
+                task.addEventListener('dragstart', handleDragStart);
+                task.addEventListener('dragend', handleDragEnd);
+            });
+
+            columns.forEach(column => {
+                column.addEventListener('dragover', handleDragOver);
+                 column.addEventListener('dragenter', handleDragEnter); // Para gerenciar placeholder
+                 column.addEventListener('dragleave', handleDragLeave); // Para remover placeholder
+                column.addEventListener('drop', handleDrop);
+            });
+        }
+
+        // --- Inicialização ---
+
+        async function loadTasksForBoard(boardId) {
+             if (!boardId) {
+                 renderTasks([]); // Limpa se não houver boardId
+                 return;
+             }
+            try {
+                const tasks = await getTasks(boardId);
+                renderTasks(tasks);
+            } catch (error) {
+                console.error(`Erro ao carregar tarefas para o quadro ${boardId}:`, error);
+                renderTasks([]); // Limpa em caso de erro
+            }
+        }
+
+        async function loadInitialData() {
+            try {
+                const boards = await getBoards();
+                renderBoards(boards);
+                // As tarefas serão carregadas pela função renderBoards após definir currentBoardId
+            } catch (error) {
+                console.error('Erro ao carregar dados iniciais:', error);
+                 renderBoards([]); // Renderiza estado vazio se falhar
+                 renderTasks([]);
+            }
+        }
+
+        // --- Event Listeners ---
+        boardSelect.addEventListener('change', (event) => {
+            currentBoardId = parseInt(event.target.value, 10);
+            if (!isNaN(currentBoardId)) {
+                loadTasksForBoard(currentBoardId);
+            } else {
+                 renderTasks([]); // Limpa se a opção inválida for selecionada
+             }
+        });
+
+        addBoardButton.addEventListener('click', openBoardModal);
+        boardForm.addEventListener('submit', handleBoardFormSubmit);
+        boardModalCancelButton.addEventListener('click', closeBoardModal);
+
+        // Adiciona listener para botões "Nova Tarefa" em cada coluna
+        document.querySelectorAll('.add-task-button').forEach(button => {
+            button.addEventListener('click', (event) => {
+                 if (!currentBoardId) {
+                     alert("Por favor, crie ou selecione um quadro primeiro.");
+                     return;
+                 }
+                 openTaskModal(); // Abre o modal no modo de criação
+                 // O status inicial será pego dentro de openTaskModal
+                 const defaultStatus = event.target.dataset.status || 'TODO';
+                 taskStatusSelect.value = defaultStatus;
+            });
+        });
+
+        taskForm.addEventListener('submit', handleTaskFormSubmit);
+        modalCancelButton.addEventListener('click', closeTaskModal);
+        modalDeleteButton.addEventListener('click', handleDeleteTask);
+
+
+        // Carrega os dados iniciais quando a página carregar
+        document.addEventListener('DOMContentLoaded', loadInitialData);
+
+    </script>
+</body>
+</html>

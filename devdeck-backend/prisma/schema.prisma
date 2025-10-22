@@ -1,0 +1,35 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Olhando para o futuro do evento "Mover"
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  // O output padrão é node_modules/.prisma/client
+}
+
+model Board {
+  id    Int    @id @default(autoincrement())
+  name  String @unique // Nome do quadro deve ser único
+  tasks Task[]
+
+  @@map("boards") // Nome da tabela no banco
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  // Enumeração para status (melhor que string solta)
+  status      String   @default("TODO") // TODO, DOING, DONE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt // Atualiza automaticamente
+  boardId     Int
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade) // Deletar tarefas se o quadro for deletado
+
+  @@map("tasks") // Nome da tabela no banco
+}
