@@ -1,7 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// schema.prisma
 
-// Olhando para o futuro do evento "Mover"
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -9,27 +7,42 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
-  // O output padrão é node_modules/.prisma/client
+}
+
+// --- NOVO MODELO USER ---
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String // Armazenará o hash da senha
+  boards    Board[] // Relação com os quadros do usuário
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
 }
 
 model Board {
-  id    Int    @id @default(autoincrement())
-  name  String @unique // Nome do quadro deve ser único
-  tasks Task[]
+  id     Int    @id @default(autoincrement())
+  name   String // Nome não precisa mais ser globalmente único, apenas por usuário
+  tasks  Task[]
+  // --- ADICIONAR RELAÇÃO COM USER ---
+  userId Int // Chave estrangeira
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade) // Deletar quadros se o user for deletado
 
-  @@map("boards") // Nome da tabela no banco
+  // Adiciona índice único para nome E userId, permitindo nomes iguais para usuários diferentes
+  @@unique([name, userId])
+  @@map("boards")
 }
 
 model Task {
   id          Int      @id @default(autoincrement())
   title       String
   description String?
-  // Enumeração para status (melhor que string solta)
   status      String   @default("TODO") // TODO, DOING, DONE
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt // Atualiza automaticamente
+  updatedAt   DateTime @updatedAt
   boardId     Int
-  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade) // Deletar tarefas se o quadro for deletado
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
 
-  @@map("tasks") // Nome da tabela no banco
+  @@map("tasks")
 }
