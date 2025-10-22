@@ -6,7 +6,7 @@
     <title>DevDeck Kanban</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Estilos Gerais (mantidos e alguns adicionados/ajustados) */
+        /* Estilos Gerais */
         body { font-family: 'Inter', sans-serif; background-color: #181c2f; color: #e0e6ff; }
         .auth-container { background-color: #23284a; box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4); }
         .auth-input { background-color: #1e223b; border: 1px solid #3a416f; color: #e0e6ff; }
@@ -14,7 +14,6 @@
         .auth-button:hover { background-image: linear-gradient(to right, #a259ff, #00eaff); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(162, 89, 255, 0.3); }
         .link-style { color: #00eaff; cursor: pointer; }
         .link-style:hover { text-decoration: underline; color: #a259ff; }
-        /* ... (mantém estilos de .task-placeholder, .dragging, .modal, .modal-content, etc.) ... */
         .task-placeholder { background-color: rgba(67, 76, 125, 0.5); border: 2px dashed #a259ff; border-radius: 0.5rem; min-height: 60px; margin-bottom: 0.75rem; }
         .dragging { opacity: 0.6; transform: rotate(2deg); cursor: grabbing; }
         .modal { background-color: rgba(0, 0, 0, 0.6); }
@@ -38,22 +37,19 @@
         .rename-icon:hover { color: #a259ff; } .delete-icon { color: #f56565; } .delete-icon:hover { color: #c53030; }
         #add-board-button { margin-left: auto; flex-shrink: 0; }
         .board-selector-container::-webkit-scrollbar { height: 8px; } .board-selector-container::-webkit-scrollbar-track { background: #1e223b; border-radius: 4px;} .board-selector-container::-webkit-scrollbar-thumb { background: #3a416f; border-radius: 4px;} .board-selector-container::-webkit-scrollbar-thumb:hover { background: #4a517e; }
-
     </style>
      <link rel="preconnect" href="https://fonts.googleapis.com">
      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center"> <header class="w-full max-w-7xl flex items-center justify-between mb-6 sm:mb-10 px-4">
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+
+    <header class="w-full max-w-7xl flex items-center justify-between mb-6 sm:mb-10 px-4">
          <div class="flex items-center">
              <img src="./img/logo-DevDesck-removebg-preview.png" alt="DevDeck Logo" class="w-10 h-10 sm:w-12 sm:h-12 mr-3 filter drop-shadow-[0_0_8px_rgba(162,89,255,0.7)]"/>
-            <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 bg-clip-text text-transparent tracking-wide" style="text-shadow: 0 0 8px rgba(162, 89, 255, 0.4);">
-                DevDeck
-            </h1>
+            <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 bg-clip-text text-transparent tracking-wide" style="text-shadow: 0 0 8px rgba(162, 89, 255, 0.4);">DevDeck</h1>
          </div>
-         <button id="logout-button" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg hidden">
-             Sair
-         </button>
+         <button id="logout-button" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg hidden">Sair</button>
     </header>
 
     <div id="loading-indicator" class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
@@ -65,8 +61,11 @@
         <div id="boards-container" class="board-selector-container">
             <span class="text-gray-500 italic p-3">Carregando quadros...</span>
         </div>
-
-        <section id="kanban-board" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div id="no-boards-message" class="text-center py-10 px-6 bg-[#23284a] rounded-lg shadow-lg hidden">
+             <h3 class="text-xl font-semibold text-cyan-300 mb-4">Nenhum quadro encontrado!</h3>
+             <p class="text-gray-400 mb-6">Parece que você ainda não criou nenhum quadro. Clique em "+ Novo Quadro" para começar a organizar suas tarefas.</p>
+        </div>
+        <section id="kanban-board" class="grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
             <div class="column bg-[#23284a] rounded-xl shadow-lg p-4 flex flex-col" data-status="TODO">
                 <h2 class="column-header text-xl font-semibold mb-4 text-center">To Do</h2>
                 <div class="tasks flex-grow min-h-[100px] space-y-3" id="todo-tasks"></div>
@@ -85,7 +84,8 @@
         </section>
     </main>
 
-    <div id="auth-section" class="w-full max-w-md mt-10"> <div id="login-view" class="auth-container p-8 rounded-lg">
+    <div id="auth-section" class="w-full max-w-md mt-10">
+        <div id="login-view" class="auth-container p-8 rounded-lg">
             <h2 class="text-2xl font-semibold mb-6 text-center text-cyan-300">Login</h2>
             <form id="login-form">
                 <div class="mb-4">
@@ -97,15 +97,10 @@
                     <input type="password" id="login-password" class="auth-input w-full p-2 rounded" required>
                 </div>
                 <p id="login-error" class="text-red-400 text-sm mb-4 text-center hidden"></p>
-                <button type="submit" class="auth-button w-full text-white font-semibold py-2 px-4 rounded-lg">
-                    Entrar
-                </button>
+                <button type="submit" class="auth-button w-full text-white font-semibold py-2 px-4 rounded-lg">Entrar</button>
             </form>
-            <p class="mt-6 text-center text-sm">
-                Não tem uma conta? <span id="show-signup" class="link-style">Cadastre-se</span>
-            </p>
+            <p class="mt-6 text-center text-sm">Não tem uma conta? <span id="show-signup" class="link-style">Cadastre-se</span></p>
         </div>
-
         <div id="signup-view" class="auth-container p-8 rounded-lg hidden">
             <h2 class="text-2xl font-semibold mb-6 text-center text-cyan-300">Cadastro</h2>
             <form id="signup-form">
@@ -123,27 +118,46 @@
                     <input type="password" id="signup-confirm-password" class="auth-input w-full p-2 rounded" required minlength="6">
                 </div>
                 <p id="signup-error" class="text-red-400 text-sm mb-4 text-center hidden"></p>
-                <button type="submit" class="auth-button w-full text-white font-semibold py-2 px-4 rounded-lg">
-                    Cadastrar
-                </button>
+                <button type="submit" class="auth-button w-full text-white font-semibold py-2 px-4 rounded-lg">Cadastrar</button>
             </form>
-            <p class="mt-6 text-center text-sm">
-                Já tem uma conta? <span id="show-login" class="link-style">Faça login</span>
-            </p>
+            <p class="mt-6 text-center text-sm">Já tem uma conta? <span id="show-login" class="link-style">Faça login</span></p>
         </div>
-
     </div>
 
-    <div id="task-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">...</div>
-    <div id="board-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">...</div>
+    <div id="task-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+        <div class="modal-content p-6 rounded-lg w-full max-w-md mx-4">
+            <h3 id="modal-title" class="text-xl font-semibold mb-4 text-cyan-300">Nova Tarefa</h3>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <div class="mb-4"><label for="task-title" class="block text-sm font-medium mb-1">Título:</label><input type="text" id="task-title" name="title" class="modal-input w-full p-2 rounded" required maxlength="255"></div>
+                <div class="mb-4"><label for="task-description" class="block text-sm font-medium mb-1">Descrição:</label><textarea id="task-description" name="description" rows="3" class="modal-textarea w-full p-2 rounded" maxlength="1000"></textarea></div>
+                <div class="mb-6"><label for="task-status" class="block text-sm font-medium mb-1">Status:</label><select id="task-status" name="status" class="modal-select w-full p-2 rounded"><option value="TODO">To Do</option><option value="DOING">Doing</option><option value="DONE">Done</option></select></div>
+                <div class="flex justify-end gap-3"><button type="button" id="modal-cancel" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" id="modal-save" class="modal-button text-white font-semibold py-2 px-4 rounded-lg">Salvar Tarefa</button><button type="button" id="modal-delete" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg hidden">Excluir</button></div>
+            </form>
+        </div>
+    </div>
 
-    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">...</svg>
+     <div id="board-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+        <div class="modal-content p-6 rounded-lg w-full max-w-sm mx-4">
+            <h3 id="board-modal-title" class="text-xl font-semibold mb-4 text-cyan-300">Novo Quadro</h3>
+            <form id="board-form">
+                <input type="hidden" id="board-id">
+                <div class="mb-6"><label for="board-name" class="block text-sm font-medium mb-1">Nome do Quadro:</label><input type="text" id="board-name" name="name" class="modal-input w-full p-2 rounded" required maxlength="100"><p id="board-error" class="text-red-400 text-sm mt-1 hidden"></p></div>
+                <div class="flex justify-end gap-3"><button type="button" id="board-modal-cancel" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" id="board-modal-save" class="modal-button text-white font-semibold py-2 px-4 rounded-lg">Criar Quadro</button></div>
+            </form>
+        </div>
+    </div>
+
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+      <symbol id="icon-pencil" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></symbol>
+      <symbol id="icon-trash" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></symbol>
+    </svg>
 
     <script>
         const API_BASE_URL = 'http://localhost:3000/api';
-        const TOKEN_KEY = 'devdeck_auth_token'; // Chave para guardar token no localStorage
+        const TOKEN_KEY = 'devdeck_auth_token';
 
-        // Elementos DOM (adicionar elementos de Auth)
+        // Elementos DOM Auth
         const loadingIndicator = document.getElementById('loading-indicator');
         const appContainer = document.getElementById('app-container');
         const authSection = document.getElementById('auth-section');
@@ -162,8 +176,10 @@
         const showLoginLink = document.getElementById('show-login');
         const logoutButton = document.getElementById('logout-button');
 
-        // Elementos do Kanban (mantidos)
+        // Elementos DOM Kanban
         const boardsContainer = document.getElementById('boards-container');
+        const kanbanBoardSection = document.getElementById('kanban-board');
+        const noBoardsMessage = document.getElementById('no-boards-message');
         const taskModal = document.getElementById('task-modal');
         const taskForm = document.getElementById('task-form');
         const modalTitle = document.getElementById('modal-title');
@@ -183,259 +199,113 @@
         const boardModalCancelButton = document.getElementById('board-modal-cancel');
         const boardModalSaveButton = document.getElementById('board-modal-save');
 
-
         let currentBoardId = null;
         let allBoards = [];
         let draggedTaskElement = null;
-        let authToken = localStorage.getItem(TOKEN_KEY); // Guarda o token JWT
+        let authToken = localStorage.getItem(TOKEN_KEY);
 
-        // --- Funções da API (Modificada fetchApi, novas auth) ---
-        async function fetchApi(endpoint, options = {}, isAuth = false) { // Adicionado isAuth flag
+        // --- Funções da API (com Auth) ---
+        async function fetchApi(endpoint, options = {}, isAuth = false) {
             loadingIndicator.classList.remove('hidden');
-            const headers = {
-                'Content-Type': 'application/json',
-                ...options.headers,
-            };
-
-            // Adiciona token se necessário e disponível
-            if (!isAuth && authToken) {
-                headers['Authorization'] = `Bearer ${authToken}`;
-            }
-
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            if (!isAuth && authToken) { headers['Authorization'] = `Bearer ${authToken}`; }
             try {
-                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                    ...options,
-                    headers, // Usa os headers montados
-                });
-
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
                 if (!response.ok) {
-                    // Se erro 401 (Não Autorizado), força logout
-                    if (response.status === 401 && !isAuth) {
-                        console.warn('Token inválido ou expirado. Fazendo logout.');
-                        logout();
-                        throw new Error('Sessão inválida ou expirada. Faça login novamente.');
-                    }
-
-                    const errorData = await response.json();
-                    console.error('API Error:', response.status, errorData);
-                    let specificMessage = 'Erro desconhecido';
-                    if (errorData && typeof errorData === 'object') {
-                        if (Array.isArray(errorData.message)) { specificMessage = errorData.message.join(', '); }
-                        else if (errorData.message) { specificMessage = errorData.message; }
-                        else if (errorData.error) { specificMessage = errorData.error; }
-                    } else if (typeof errorData === 'string') { specificMessage = errorData; }
-                    throw new Error(specificMessage || `Erro na API: ${response.statusText}`);
+                    if (response.status === 401 && !isAuth) { console.warn('Token inválido/expirado. Logout.'); logout(); throw new Error('Sessão inválida. Faça login.'); }
+                    const errorData = await response.json(); console.error('API Error:', response.status, errorData);
+                    let msg = 'Erro desconhecido';
+                    if (errorData && typeof errorData === 'object') { msg = Array.isArray(errorData.message) ? errorData.message.join(', ') : errorData.message || errorData.error || msg; }
+                    else if (typeof errorData === 'string') { msg = errorData; }
+                    throw new Error(msg || `Erro na API: ${response.statusText}`);
                 }
-
-                if (response.status === 204) { return null; }
-                return await response.json();
+                return response.status === 204 ? null : await response.json();
             } catch (error) {
-                console.error('Erro ao chamar API:', error);
-                if (!isAuth && error.message.includes('Faça login novamente')) {
-                   // Não mostra alert duplicado se já foi deslogado
-                } else {
-                  alert(`Erro: ${error.message}`); // Mostra erro genérico
-                }
-                throw error;
-            } finally {
-                loadingIndicator.classList.add('hidden');
-            }
+                console.error('Erro API:', error); if (!error.message.includes('Sessão inválida')) { alert(`Erro: ${error.message}`); } throw error;
+            } finally { loadingIndicator.classList.add('hidden'); }
         }
-
-        // Funções de Autenticação
-        async function signup(email, password) {
-            return await fetchApi('/auth/signup', {
-                method: 'POST',
-                body: JSON.stringify({ email, password }),
-            }, true); // isAuth = true
-        }
-
-        async function login(email, password) {
-            const data = await fetchApi('/auth/login', {
-                method: 'POST',
-                body: JSON.stringify({ email, password }),
-            }, true); // isAuth = true
-            if (data && data.access_token) {
-                authToken = data.access_token;
-                localStorage.setItem(TOKEN_KEY, authToken); // Salva no localStorage
-            }
-            return data;
-        }
-
-        function logout() {
-            authToken = null;
-            localStorage.removeItem(TOKEN_KEY); // Remove do localStorage
-            showLoginView(); // Mostra tela de login
-            // Limpa dados da aplicação (opcional, mas recomendado)
-            currentBoardId = null;
-            allBoards = [];
-            boardsContainer.innerHTML = ''; // Limpa botões de quadros
-            document.querySelectorAll('.tasks').forEach(col => col.innerHTML = ''); // Limpa colunas de tarefas
-        }
-
-
-        // Funções CRUD (usam fetchApi modificado)
+        async function signup(email, password) { return await fetchApi('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password }) }, true); }
+        async function login(email, password) { const data = await fetchApi('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, true); if (data?.access_token) { authToken = data.access_token; localStorage.setItem(TOKEN_KEY, authToken); } return data; }
+        function logout() { authToken = null; localStorage.removeItem(TOKEN_KEY); showLoginView(); currentBoardId = null; allBoards = []; boardsContainer.innerHTML = ''; document.querySelectorAll('.tasks').forEach(col => col.innerHTML = ''); }
         async function getBoards() { return await fetchApi('/boards'); }
-        async function createBoard(name) { /* ... (código mantido, usa fetchApi) ... */ }
+        async function createBoard(name) { boardError.classList.add('hidden'); try { return await fetchApi('/boards', { method: 'POST', body: JSON.stringify({ name }) }); } catch (error) { if (error.message?.includes('já existe')) { boardError.textContent = `Quadro "${name}" já existe.`; boardError.classList.remove('hidden'); } else { alert(`Erro: ${error.message}`); } throw error; } }
         async function getTasks(boardId) { if (!boardId) return []; return await fetchApi(`/tasks?boardId=${boardId}`); }
         async function createTask(taskData) { return await fetchApi('/tasks', { method: 'POST', body: JSON.stringify(taskData) }); }
         async function updateTask(taskId, taskData) { return await fetchApi(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(taskData) }); }
         async function deleteTask(taskId) { return await fetchApi(`/tasks/${taskId}`, { method: 'DELETE' }); }
-        async function updateBoard(boardId, boardData) { /* ... (código mantido, usa fetchApi) ... */ }
+        async function updateBoard(boardId, boardData) { boardError.classList.add('hidden'); try { return await fetchApi(`/boards/${boardId}`, { method: 'PATCH', body: JSON.stringify(boardData) }); } catch(error) { if (error.message?.includes('já existe')) { boardError.textContent = `Nome "${boardData.name}" já existe.`; boardError.classList.remove('hidden'); } else { alert(`Erro: ${error.message}`); } throw error; } }
         async function deleteBoard(boardId) { return await fetchApi(`/boards/${boardId}`, { method: 'DELETE' }); }
 
         // --- Controle de Views ---
-        function showLoginView() {
-            appContainer.classList.add('hidden');
-            authSection.classList.remove('hidden');
-            loginView.classList.remove('hidden');
-            signupView.classList.add('hidden');
-            logoutButton.classList.add('hidden');
-            loginError.classList.add('hidden'); // Esconde erros ao trocar de view
-            signupError.classList.add('hidden');
+        function showLoginView() { appContainer.classList.add('hidden'); authSection.classList.remove('hidden'); loginView.classList.remove('hidden'); signupView.classList.add('hidden'); logoutButton.classList.add('hidden'); loginError.classList.add('hidden'); signupError.classList.add('hidden'); }
+        function showSignupView() { appContainer.classList.add('hidden'); authSection.classList.remove('hidden'); loginView.classList.add('hidden'); signupView.classList.remove('hidden'); logoutButton.classList.add('hidden'); loginError.classList.add('hidden'); signupError.classList.add('hidden'); }
+        function showKanbanView() { authSection.classList.add('hidden'); appContainer.classList.remove('hidden'); logoutButton.classList.remove('hidden'); loadInitialData(); }
+
+        // --- Renderização Kanban ---
+        function renderBoardSelectors(boards) {
+            boardsContainer.innerHTML = '';
+            boards.forEach(board => {
+                const button = document.createElement('button'); button.className = 'board-button'; button.dataset.boardId = board.id;
+                const nameSpan = document.createElement('span'); nameSpan.textContent = board.name; button.appendChild(nameSpan);
+                const iconsDiv = document.createElement('div'); iconsDiv.className = 'flex items-center gap-2 ml-2';
+                const renameSVG = `<svg class="board-action-icon rename-icon w-4 h-4"><use xlink:href="#icon-pencil"></use></svg>`;
+                const deleteSVG = `<svg class="board-action-icon delete-icon w-4 h-4"><use xlink:href="#icon-trash"></use></svg>`;
+                iconsDiv.innerHTML = renameSVG + deleteSVG;
+                iconsDiv.querySelector('.rename-icon').addEventListener('click', (e) => { e.stopPropagation(); openBoardModal(board); });
+                iconsDiv.querySelector('.delete-icon').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteBoard(board.id, board.name); });
+                button.appendChild(iconsDiv);
+                button.addEventListener('click', () => handleBoardSelection(board.id)); boardsContainer.appendChild(button);
+            });
+            const newBtn = document.createElement('button'); newBtn.id = 'add-board-button'; newBtn.className = 'modal-button text-white font-semibold py-2 px-4 rounded-lg text-base whitespace-nowrap ml-auto flex-shrink-0'; newBtn.textContent = '+ Novo Quadro';
+            newBtn.addEventListener('click', () => openBoardModal()); boardsContainer.appendChild(newBtn);
         }
+        function setActiveBoardUI(id) { document.querySelectorAll('.board-button').forEach(b => b.classList.toggle('active-board', parseInt(b.dataset.boardId, 10) === id)); }
+        function renderTasks(tasks) { document.querySelectorAll('.tasks').forEach(c => c.innerHTML = ''); if (!tasks || !tasks.length) { setupDragAndDrop(); return; } tasks.forEach(t => { const colId = `${t.status.toLowerCase()}-tasks`; const colEl = document.getElementById(colId); if (colEl) colEl.appendChild(createTaskElement(t)); else console.warn(`Coluna ${colId} não encontrada.`); }); setupDragAndDrop(); }
+        function createTaskElement(task) { const d=document.createElement('div'); d.className='task-card bg-[#2e335a] rounded-lg shadow-md p-3 mb-3 cursor-grab text-white'; d.draggable=true; d.dataset.taskId=task.id; d.dataset.status=task.status; const t=document.createElement('strong'); t.className='block font-semibold mb-1 truncate'; t.textContent=task.title; d.appendChild(t); if(task.description){const s=document.createElement('small'); s.className='block text-gray-400 text-sm break-words'; s.textContent=task.description; d.appendChild(s);} d.addEventListener('click', (e)=>{if(draggedTaskElement) return; openTaskModal(task)}); return d; }
 
-        function showSignupView() {
-            appContainer.classList.add('hidden');
-            authSection.classList.remove('hidden');
-            loginView.classList.add('hidden');
-            signupView.classList.remove('hidden');
-            logoutButton.classList.add('hidden');
-            loginError.classList.add('hidden');
-            signupError.classList.add('hidden');
+        // --- Modais Tarefa ---
+        function openTaskModal(t = null) { taskForm.reset(); taskIdInput.value=''; modalDeleteButton.classList.add('hidden'); if (t){ modalTitle.textContent='Editar Tarefa'; taskIdInput.value=t.id; taskTitleInput.value=t.title; taskDescriptionInput.value=t.description||''; taskStatusSelect.value=t.status; modalSaveButton.textContent='Salvar Alterações'; modalDeleteButton.classList.remove('hidden'); } else { modalTitle.textContent='Nova Tarefa'; modalSaveButton.textContent='Criar Tarefa'; const btn=event?.target; taskStatusSelect.value=(btn?.dataset.status)||'TODO'; } taskModal.classList.remove('hidden'); taskTitleInput.focus(); }
+        function closeTaskModal() { taskModal.classList.add('hidden'); }
+        async function handleTaskFormSubmit(e) { e.preventDefault(); const id=taskIdInput.value; const d={title: taskTitleInput.value.trim(), description:taskDescriptionInput.value.trim()||null, status:taskStatusSelect.value, boardId:currentBoardId}; if(!d.boardId){alert('Quadro não selecionado.'); return;} if(!d.title){alert('Título obrigatório.'); return;} try { if(id) await updateTask(id,d); else await createTask(d); closeTaskModal(); loadTasksForBoard(currentBoardId); } catch(err){ console.error('Falha salvar tarefa:', err); } }
+        async function handleDeleteTask() { const id=taskIdInput.value; if(!id)return; if(confirm(`Excluir tarefa "${taskTitleInput.value}"?`)){try{await deleteTask(id); closeTaskModal(); loadTasksForBoard(currentBoardId);}catch(err){console.error('Falha excluir tarefa:', err);}} }
+
+        // --- Modais Quadro ---
+        function openBoardModal(b = null) { boardForm.reset(); boardIdInput.value=''; boardError.classList.add('hidden'); if(b){ boardModalTitle.textContent='Renomear Quadro'; boardIdInput.value=b.id; boardNameInput.value=b.name; boardModalSaveButton.textContent='Salvar Alterações'; } else { boardModalTitle.textContent='Novo Quadro'; boardModalSaveButton.textContent='Criar Quadro'; } boardModal.classList.remove('hidden'); boardNameInput.focus(); boardNameInput.select(); }
+        function closeBoardModal() { boardModal.classList.add('hidden'); }
+        async function handleBoardFormSubmit(e) { e.preventDefault(); const n=boardNameInput.value.trim(); const id=boardIdInput.value; if(!n) return; try{ let board; if(id) board=await updateBoard(id,{name:n}); else board=await createBoard(n); closeBoardModal(); await loadInitialData(board.id); } catch(err){} }
+        async function handleDeleteBoard(id, name) { if(confirm(`Excluir quadro "${name}"?\n\nATENÇÃO: Todas as tarefas serão excluídas!`)){ try{ await deleteBoard(id); console.log(`Quadro ${id} excluído.`); const wasCurrent=currentBoardId===id; await loadInitialData(wasCurrent?null:currentBoardId); } catch(err){ console.error(`Falha excluir quadro ${id}:`, err); } } }
+
+        // --- Drag and Drop ---
+        function handleDragStart(e){const t=e.target.closest('.task-card'); if(!t){e.preventDefault(); return;} draggedTaskElement=t; e.dataTransfer.setData('text/plain', t.dataset.taskId); e.dataTransfer.effectAllowed='move'; setTimeout(()=>t.classList.add('dragging'),0);}
+        function handleDragEnd(e){if(draggedTaskElement)draggedTaskElement.classList.remove('dragging'); draggedTaskElement=null; document.querySelectorAll('.task-placeholder').forEach(p=>p.remove());}
+        function handleDragOver(e){e.preventDefault(); e.dataTransfer.dropEffect='move'; const tc=e.target.closest('.tasks'); if(!tc||!draggedTaskElement)return; const p=tc.querySelector('.task-placeholder'); if(!p){document.querySelectorAll('.task-placeholder').forEach(p=>p.remove()); const nP=document.createElement('div'); nP.className='task-placeholder'; const aE=getDragAfterElement(tc,e.clientY); if(aE==null)tc.appendChild(nP); else tc.insertBefore(nP,aE);}else{const aE=getDragAfterElement(tc,e.clientY); if(aE!==p.nextSibling){if(aE==null)tc.appendChild(p); else tc.insertBefore(p,aE);}}}
+        function getDragAfterElement(c,y){const dE=[...c.querySelectorAll('.task-card:not(.dragging)')]; return dE.reduce((cl,ch)=>{const b=ch.getBoundingClientRect(); const o=y-b.top-b.height/2; if(o<0&&o>cl.offset)return{offset:o,element:ch}; else return cl;},{offset:Number.NEGATIVE_INFINITY}).element;}
+        function handleDragEnter(e){e.preventDefault();}
+        function handleDragLeave(e){const t=e.target.closest('.tasks'); if(t&&!t.contains(e.relatedTarget)){const p=t.querySelector('.task-placeholder'); if(p)p.remove();}}
+        async function handleDrop(e){e.preventDefault(); const tC=e.target.closest('.tasks'); const c=tC?.closest('.column'); const p=tC?.querySelector('.task-placeholder'); document.querySelectorAll('.task-placeholder').forEach(p=>p.remove()); if(draggedTaskElement)draggedTaskElement.classList.remove('dragging'); if(!c||!tC||!draggedTaskElement){draggedTaskElement=null; return;} const tId=draggedTaskElement.dataset.taskId; const nS=c.dataset.status; const oS=draggedTaskElement.dataset.status; if(p){tC.insertBefore(draggedTaskElement,p); p.remove();} else {const aE=getDragAfterElement(tC,e.clientY); if(aE==null)tC.appendChild(draggedTaskElement); else tC.insertBefore(draggedTaskElement,aE);} draggedTaskElement.dataset.status=nS; const lDE=draggedTaskElement; draggedTaskElement=null; if(nS!==oS){try{await updateTask(tId,{status:nS}); console.log(`Tarefa ${tId} movida para ${nS}`);}catch(err){console.error('Falha D&D:', err); const oC=document.querySelector(`.column[data-status="${oS}"] .tasks`); if(oC){oC.appendChild(lDE); lDE.dataset.status=oS;} alert('Erro ao mover tarefa.');}}}
+        function setupDragAndDrop(){document.querySelectorAll('.task-card').forEach(t=>{t.removeEventListener('dragstart',handleDragStart); t.removeEventListener('dragend',handleDragEnd);}); document.querySelectorAll('.column .tasks').forEach(c=>{c.removeEventListener('dragover',handleDragOver); c.removeEventListener('dragenter',handleDragEnter); c.removeEventListener('dragleave',handleDragLeave); c.removeEventListener('drop',handleDrop);}); const ts=document.querySelectorAll('.task-card'); const cs=document.querySelectorAll('.column .tasks'); ts.forEach(t=>{t.addEventListener('dragstart',handleDragStart); t.addEventListener('dragend',handleDragEnd);}); cs.forEach(c=>{c.addEventListener('dragover',handleDragOver); c.addEventListener('dragenter',handleDragEnter); c.addEventListener('dragleave',handleDragLeave); c.addEventListener('drop',handleDrop);});}
+
+        // --- Inicialização Kanban e Seleção ---
+        async function loadTasksForBoard(id) { if(!id){renderTasks([]); return;} try{const ts=await getTasks(id); renderTasks(ts);}catch(err){console.error(`Erro carregar tasks ${id}:`, err); renderTasks([]);}}
+        function handleBoardSelection(id) { const i=parseInt(id,10); if(isNaN(i)||i<=0){currentBoardId=null; setActiveBoardUI(null); renderTasks([]); return;} if(i!==currentBoardId){currentBoardId=i; setActiveBoardUI(i); loadTasksForBoard(i);}}
+        async function loadInitialData(selectId=null) {
+            if(!authToken){console.warn("Sem auth token."); logout(); return;}
+            try { allBoards=await getBoards(); renderBoardSelectors(allBoards);
+                if(allBoards.length===0){ kanbanBoardSection.classList.add('hidden'); noBoardsMessage.classList.remove('hidden'); currentBoardId=null; setActiveBoardUI(null); renderTasks([]); console.log("Nenhum quadro, mostra msg."); }
+                else { kanbanBoardSection.classList.remove('hidden'); noBoardsMessage.classList.add('hidden'); let initId=selectId; if(!initId){const defaults=["Tasks Pendentes","Novas Ideias","Alinhamento com Cliente"]; let found=false; for(const n of defaults){const b=allBoards.find(b=>b.name===n); if(b){initId=b.id; found=true; break;}} if(!found)initId=allBoards[0].id;} handleBoardSelection(initId); }
+            } catch(err){ console.error('Erro loadInitialData:', err); if(authToken){boardsContainer.innerHTML='<span class="text-red-500 p-3">Erro ao carregar</span>'; kanbanBoardSection.classList.add('hidden'); noBoardsMessage.classList.add('hidden'); renderTasks([]);}}
         }
-
-        function showKanbanView() {
-            authSection.classList.add('hidden');
-            appContainer.classList.remove('hidden');
-            logoutButton.classList.remove('hidden');
-            loadInitialData(); // Carrega os dados do Kanban
-        }
-
-        // --- Funções de Renderização Kanban (sem alterações internas) ---
-        function renderBoardSelectors(boards) { /* ... (código mantido) ... */ }
-        function setActiveBoardUI(selectedBoardId) { /* ... (código mantido) ... */ }
-        function renderTasks(tasks) { /* ... (código mantido) ... */ }
-        function createTaskElement(task) { /* ... (código mantido) ... */ }
-
-        // --- Funções do Modal Tarefa (sem alterações internas) ---
-        function openTaskModal(task = null) { /* ... (código mantido) ... */ }
-        function closeTaskModal() { /* ... (código mantido) ... */ }
-        async function handleTaskFormSubmit(event) { /* ... (código mantido) ... */ }
-        async function handleDeleteTask() { /* ... (código mantido) ... */ }
-
-        // --- Funções do Modal Quadro (sem alterações internas) ---
-        function openBoardModal(boardToEdit = null) { /* ... (código mantido) ... */ }
-        function closeBoardModal() { /* ... (código mantido) ... */ }
-        async function handleBoardFormSubmit(event) { /* ... (código mantido) ... */ }
-        async function handleDeleteBoard(boardId, boardName) { /* ... (código mantido) ... */ }
-
-        // --- Drag and Drop (sem alterações internas) ---
-        function handleDragStart(event) { /* ... (código mantido) ... */ }
-        function handleDragEnd(event) { /* ... (código mantido) ... */ }
-        function handleDragOver(event) { /* ... (código mantido) ... */ }
-        function getDragAfterElement(container, y) { /* ... (código mantido) ... */ }
-        function handleDragEnter(event) { /* ... (código mantido) ... */ }
-        function handleDragLeave(event) { /* ... (código mantido) ... */ }
-        async function handleDrop(event) { /* ... (código mantido) ... */ }
-        function setupDragAndDrop() { /* ... (código mantido) ... */ }
-
-        // --- Inicialização Kanban e Seleção de Quadro ---
-        async function loadTasksForBoard(boardId) { /* ... (código mantido) ... */ }
-        function handleBoardSelection(boardId) { /* ... (código mantido) ... */ }
-        async function loadInitialData(selectBoardId = null) {
-             // Só executa se estiver autenticado
-             if (!authToken) {
-                 console.warn("Tentando carregar dados do Kanban sem autenticação.");
-                 logout(); // Garante que está na tela de login
-                 return;
-             }
-             try {
-                allBoards = await getBoards(); renderBoardSelectors(allBoards); let initialBoardId = selectBoardId;
-                if (!initialBoardId) {
-                    const defaultBoardNamesOrder = ["Tasks Pendentes", "Novas Ideias", "Alinhamento com Cliente"]; let foundDefault = false;
-                    for (const name of defaultBoardNamesOrder) { const board = allBoards.find(b => b.name === name); if (board) { initialBoardId = board.id; foundDefault = true; break; } }
-                    if (!foundDefault && allBoards.length > 0) { initialBoardId = allBoards[0].id; } else if (allBoards.length === 0) { initialBoardId = null; }
-                }
-                if (initialBoardId) { handleBoardSelection(initialBoardId); } else { currentBoardId = null; setActiveBoardUI(null); renderTasks([]); console.log("Nenhum quadro encontrado para este usuário."); }
-            } catch (error) {
-                // Erro já tratado em fetchApi (incluindo deslogar se for 401)
-                console.error('Erro ao carregar dados iniciais do Kanban:', error);
-                // Não precisa renderizar erro aqui se fetchApi já deslogou
-                if (authToken) { // Só mostra erro se ainda estiver "logado"
-                   boardsContainer.innerHTML = '<span class="text-red-500 p-3">Erro ao carregar quadros</span>'; renderTasks([]);
-                }
-            }
-         }
 
         // --- Event Listeners ---
-
-        // Navegação Auth
-        showSignupLink.addEventListener('click', showSignupView);
-        showLoginLink.addEventListener('click', showLoginView);
-        logoutButton.addEventListener('click', logout);
-
-        // Formulário Login
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            loginError.classList.add('hidden');
-            const email = loginEmailInput.value;
-            const password = loginPasswordInput.value;
-            try {
-                await login(email, password);
-                showKanbanView(); // Mostra o Kanban após login bem-sucedido
-            } catch (error) {
-                loginError.textContent = error.message || 'Erro ao fazer login.';
-                loginError.classList.remove('hidden');
-            }
-        });
-
-        // Formulário Signup
-        signupForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            signupError.classList.add('hidden');
-            const email = signupEmailInput.value;
-            const password = signupPasswordInput.value;
-            const confirmPassword = signupConfirmPasswordInput.value;
-
-            if (password !== confirmPassword) {
-                signupError.textContent = 'As senhas não coincidem.';
-                signupError.classList.remove('hidden');
-                return;
-            }
-            if (password.length < 6) {
-                 signupError.textContent = 'A senha deve ter pelo menos 6 caracteres.';
-                 signupError.classList.remove('hidden');
-                 return;
-            }
-
-            try {
-                await signup(email, password);
-                alert('Cadastro realizado com sucesso! Faça o login.'); // Mensagem simples
-                showLoginView(); // Redireciona para login após cadastro
-            } catch (error) {
-                signupError.textContent = error.message || 'Erro ao cadastrar.';
-                signupError.classList.remove('hidden');
-            }
-        });
-
-
-        // Listeners Kanban (mantidos)
-        document.querySelectorAll('.add-task-button').forEach(button => { button.addEventListener('click', (event) => { if (!currentBoardId) { alert("Selecione ou crie um quadro."); return; } openTaskModal(); const defaultStatus = event.target.dataset.status || 'TODO'; taskStatusSelect.value = defaultStatus; }); });
+        showSignupLink.addEventListener('click', showSignupView); showLoginLink.addEventListener('click', showLoginView); logoutButton.addEventListener('click', logout);
+        loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginError.classList.add('hidden'); const em=loginEmailInput.value; const pw=loginPasswordInput.value; try { await login(em,pw); showKanbanView(); } catch (err) { loginError.textContent=err.message||'Erro login.'; loginError.classList.remove('hidden'); } });
+        signupForm.addEventListener('submit', async (e) => { e.preventDefault(); signupError.classList.add('hidden'); const em=signupEmailInput.value; const pw=signupPasswordInput.value; const cpw=signupConfirmPasswordInput.value; if(pw!==cpw){signupError.textContent='Senhas não coincidem.'; signupError.classList.remove('hidden'); return;} if(pw.length<6){signupError.textContent='Senha muito curta.'; signupError.classList.remove('hidden'); return;} try { await signup(em,pw); alert('Cadastro OK! Faça login.'); showLoginView(); } catch (err) { signupError.textContent=err.message||'Erro cadastro.'; signupError.classList.remove('hidden'); } });
+        document.querySelectorAll('.add-task-button').forEach(b => { b.addEventListener('click', (e) => { if(!currentBoardId){alert("Selecione quadro."); return;} openTaskModal(); const s=e.target.dataset.status||'TODO'; taskStatusSelect.value=s; }); });
         taskForm.addEventListener('submit', handleTaskFormSubmit); modalCancelButton.addEventListener('click', closeTaskModal); modalDeleteButton.addEventListener('click', handleDeleteTask);
         boardForm.addEventListener('submit', handleBoardFormSubmit); boardModalCancelButton.addEventListener('click', closeBoardModal);
 
-
         // --- Inicialização Geral ---
-        document.addEventListener('DOMContentLoaded', () => {
-            authToken = localStorage.getItem(TOKEN_KEY); // Pega token ao carregar
-            if (authToken) {
-                showKanbanView(); // Tenta mostrar Kanban se tiver token
-            } else {
-                showLoginView(); // Mostra login se não tiver token
-            }
-        });
-
+        document.addEventListener('DOMContentLoaded', () => { authToken=localStorage.getItem(TOKEN_KEY); if (authToken) showKanbanView(); else showLoginView(); });
     </script>
 
 </body>
