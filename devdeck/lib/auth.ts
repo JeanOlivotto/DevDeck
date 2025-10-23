@@ -2,7 +2,6 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '7d'
 
 export interface JwtPayload {
   userId: number
@@ -10,12 +9,14 @@ export interface JwtPayload {
 }
 
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION })
+  return jwt.sign(payload, JWT_SECRET as jwt.Secret, { 
+    expiresIn: '7d'
+  }) as string
 }
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload
+    return jwt.verify(token, JWT_SECRET as jwt.Secret) as JwtPayload
   } catch (error) {
     return null
   }
