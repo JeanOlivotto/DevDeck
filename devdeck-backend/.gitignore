@@ -56,3 +56,9 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
+
+# WhatsApp session files
+whatsapp_sessions/
+
+# SQLite database file
+prisma/prisma/dev.db
