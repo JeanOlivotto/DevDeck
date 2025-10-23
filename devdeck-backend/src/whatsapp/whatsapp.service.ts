@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-implied-eval */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
@@ -17,6 +18,8 @@ import {
   makeCacheableSignalKeyStore,
   AuthenticationCreds,
   WASocket,
+  AuthenticationState,
+  SignalKeyStore,
 } from '@whiskeysockets/baileys';
 import {
   Injectable,
@@ -30,7 +33,6 @@ import { EncryptionService } from '../encryption/encryption.service';
 import * as qrcode from 'qrcode';
 import { Boom } from '@hapi/boom';
 import { WhatsappGateway } from './whatsapp.gateway';
-// import { setTimeout } from 'timers/promises';
 
 interface BaileysAuthState {
   creds: AuthenticationCreds;
@@ -38,16 +40,10 @@ interface BaileysAuthState {
 }
 
 interface AuthStore {
-  state: {
-    creds: AuthenticationCreds;
-    keys: {
-      get: (type: string, ids: string[]) => { [id: string]: any };
-      set: (data: { [keyType: string]: { [id: string]: any } }) => void;
-    };
-  };
+  state: AuthenticationState;
   saveCreds: () => Promise<void>;
   clearState: () => Promise<void>;
-  loadState: () => Promise<BaileysAuthState>;
+  loadState: () => Promise<void>;
 }
 
 const pino = (opts?: any) => ({
@@ -96,7 +92,6 @@ const pino = (opts?: any) => ({
   child: (bindings: any) => pino(bindings),
   level: process.env.WHATSAPP_LOG_LEVEL || 'debug',
 });
-
 const loggerPino = pino();
 
 @Injectable()
@@ -114,12 +109,13 @@ export class WhatsappService implements OnModuleDestroy {
 
   onModuleDestroy() {
     this.logger.log('Desconectando todos os sockets Baileys...');
-    this.activeSockets.forEach((sock) => {
+    this.activeSockets.forEach((sock, userId) => {
       try {
-        sock.end(undefined);
+        sock.end(new Error('Serviço sendo desligado'));
+        this.logger.log(`Socket para usuário ${userId} encerrado.`);
       } catch (e) {
         this.logger.error(
-          `Erro ao fechar socket: ${(e as Error).message}`,
+          `Erro ao fechar socket para ${userId}: ${(e as Error).message}`,
           (e as Error).stack,
         );
       }
@@ -129,43 +125,28 @@ export class WhatsappService implements OnModuleDestroy {
   }
 
   private getInitialAuthState(): BaileysAuthState {
-    const noiseKey = {
-      public: Uint8Array.from(Buffer.alloc(32)),
-      private: Uint8Array.from(Buffer.alloc(32)),
-    };
-
+    const noiseKey = { public: Buffer.alloc(32), private: Buffer.alloc(32) };
     return {
       creds: {
         noiseKey,
         signedIdentityKey: {
-          public: Uint8Array.from(Buffer.alloc(32)),
-          private: Uint8Array.from(Buffer.alloc(32)),
+          public: Buffer.alloc(32),
+          private: Buffer.alloc(32),
         },
         signedPreKey: {
           keyId: 1,
-          keyPair: {
-            public: Uint8Array.from(Buffer.alloc(32)),
-            private: Uint8Array.from(Buffer.alloc(32)),
-          },
-          signature: Uint8Array.from(Buffer.alloc(64)),
+          keyPair: { public: Buffer.alloc(32), private: Buffer.alloc(32) },
+          signature: Buffer.alloc(64),
         },
-        registrationId: Math.floor(Math.random() * (2 ** 31 - 1)), // ID aleatório
-        advSecretKey: Uint8Array.from(Buffer.alloc(32)),
+        registrationId: Math.floor(Math.random() * (2 ** 31 - 1)),
+        advSecretKey: Buffer.alloc(32).toString('base64'),
         nextPreKeyId: 1,
         firstUnuploadedPreKeyId: 1,
         account: undefined,
         me: undefined,
         signalIdentities: [],
         lastAccountSyncTimestamp: 0,
-        pairingEphemeralKeyPair: {
-          public: Uint8Array.from(Buffer.alloc(32)),
-          private: Uint8Array.from(Buffer.alloc(32)),
-        },
-        processedHistoryMessages: [],
-        accountSyncCounter: 0,
-        accountSettings: {
-          unarchiveChats: false,
-        },
+        myAppStateKeyId: undefined,
       } as unknown as AuthenticationCreds,
       keys: {},
     };
@@ -173,29 +154,25 @@ export class WhatsappService implements OnModuleDestroy {
 
   private async loadAuthState(userId: number): Promise<BaileysAuthState> {
     if (this.authStateCache.has(userId)) {
+      this.logger.debug(`Retornando authState do cache para ${userId}`);
       return this.authStateCache.get(userId)!;
     }
-
     this.logger.debug(`Carregando authState do DB para usuário ${userId}`);
-
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: { whatsappSession: true },
       });
-
       if (user?.whatsappSession) {
         const decryptedSession = this.encryptionService.decrypt(
           user.whatsappSession,
         );
-
         if (decryptedSession) {
           try {
             const authState: BaileysAuthState = JSON.parse(
               decryptedSession,
               BufferJSON.reviver,
             );
-
             if (
               authState &&
               authState.creds &&
@@ -204,7 +181,7 @@ export class WhatsappService implements OnModuleDestroy {
             ) {
               this.authStateCache.set(userId, authState);
               this.logger.debug(
-                `AuthState carregado e decriptado com sucesso para ${userId}`,
+                `AuthState carregado e desserializado com sucesso para ${userId}`,
               );
               return authState;
             } else {
@@ -215,7 +192,7 @@ export class WhatsappService implements OnModuleDestroy {
             }
           } catch (e) {
             this.logger.error(
-              `Erro ao parsear JSON do authState para ${userId}, limpando sessão.`,
+              `Erro ao parsear JSON do authState para ${userId}, limpando sessão. Erro: ${(e as Error).message}`,
               (e as Error).stack,
             );
             await this.clearAuthState(userId);
@@ -226,18 +203,21 @@ export class WhatsappService implements OnModuleDestroy {
           );
           await this.clearAuthState(userId);
         }
+      } else {
+        this.logger.debug(`Nenhuma sessão encontrada no DB para ${userId}.`);
       }
     } catch (e) {
       this.logger.error(
-        `Erro ao carregar authState para ${userId}`,
+        `Erro ao carregar authState do DB para ${userId}`,
         (e as Error).stack,
       );
     }
-
     this.logger.debug(
       `Nenhum authState válido encontrado para ${userId}, retornando inicial.`,
     );
-    return this.getInitialAuthState();
+    const initialState = this.getInitialAuthState();
+    this.authStateCache.set(userId, initialState);
+    return initialState;
   }
 
   private async saveAuthState(
@@ -246,34 +226,37 @@ export class WhatsappService implements OnModuleDestroy {
   ): Promise<void> {
     this.authStateCache.set(userId, state);
     this.logger.debug(`Salvando authState no DB para usuário ${userId}`);
-
     try {
-      const sessionString = JSON.stringify(state, BufferJSON.replacer);
-      const encryptedSession = this.encryptionService.encrypt(sessionString);
+      const stateToSave = { ...state };
+      if ((stateToSave.creds as any)?.myAppStateKeyId)
+        delete (stateToSave.creds as any).myAppStateKeyId;
+      if ((stateToSave.creds as any)?.pairingCode)
+        delete (stateToSave.creds as any).pairingCode;
 
+      const sessionString = JSON.stringify(stateToSave, BufferJSON.replacer);
+      const encryptedSession = this.encryptionService.encrypt(sessionString);
       if (encryptedSession) {
         await this.prisma.user.update({
           where: { id: userId },
           data: { whatsappSession: encryptedSession },
         });
-        this.logger.debug(`AuthState salvo com sucesso para ${userId}`);
+        this.logger.debug(`AuthState salvo com sucesso no DB para ${userId}`);
       } else {
         this.logger.error(
-          `Falha ao criptografar sessão para usuário ${userId}`,
+          `Falha ao criptografar sessão para usuário ${userId}. Nada salvo.`,
         );
       }
     } catch (e) {
       this.logger.error(
-        `Erro ao stringify/encrypt/save authState para ${userId}`,
+        `Erro durante saveAuthState para ${userId}`,
         (e as Error).stack,
       );
     }
   }
 
   private async clearAuthState(userId: number): Promise<void> {
-    this.logger.log(`Limpando authState para usuário ${userId}`);
+    this.logger.log(`Limpando authState para usuário ${userId} (cache e DB)`);
     this.authStateCache.delete(userId);
-
     try {
       await this.prisma.user.update({
         where: { id: userId },
@@ -284,21 +267,74 @@ export class WhatsappService implements OnModuleDestroy {
       );
     } catch (e) {
       this.logger.error(
-        `Erro ao limpar authState no DB para ${userId}`,
+        `Erro ao limpar authState no DB para ${userId}, mas o cache foi limpo.`,
         (e as Error).stack,
       );
     }
   }
 
   private createPrismaAuthStore(userId: number): AuthStore {
-    let state: BaileysAuthState = this.getInitialAuthState();
+    let internalState: BaileysAuthState = this.getInitialAuthState();
 
-    const auth: AuthStore = {
+    const ensureAllKeysAreBuffers = (
+      state: BaileysAuthState,
+    ): BaileysAuthState => {
+      if (!state || !state.creds || !state.keys) {
+        this.logger.warn(
+          `[AuthStore ${userId}] ensureAllKeysAreBuffers recebeu estado inválido.`,
+        );
+        return state || this.getInitialAuthState();
+      }
+      const creds = state.creds as any;
+      const convertValueToBuffer = (value: any): Buffer | any => {
+        if (value instanceof Uint8Array && !(value instanceof Buffer))
+          return Buffer.from(value);
+        if (
+          typeof value === 'object' &&
+          value?.type === 'Buffer' &&
+          Array.isArray(value.data)
+        )
+          return Buffer.from(value.data);
+        return value;
+      };
+      const convertKeyPairToBuffer = (keyPair: any) => {
+        if (keyPair) {
+          keyPair.pubKey = convertValueToBuffer(keyPair.pubKey);
+          keyPair.privKey = convertValueToBuffer(keyPair.privKey);
+          keyPair.public = convertValueToBuffer(keyPair.public);
+          keyPair.private = convertValueToBuffer(keyPair.private);
+          keyPair.signature = convertValueToBuffer(keyPair.signature);
+        }
+        return keyPair;
+      };
+      creds.noiseKey = convertKeyPairToBuffer(creds.noiseKey);
+      creds.signedIdentityKey = convertKeyPairToBuffer(creds.signedIdentityKey);
+      creds.signedPreKey = convertKeyPairToBuffer(creds.signedPreKey);
+      if (creds.signedPreKey?.keyPair)
+        creds.signedPreKey.keyPair = convertKeyPairToBuffer(
+          creds.signedPreKey.keyPair,
+        );
+      creds.pairingEphemeralKeyPair = convertKeyPairToBuffer(
+        creds.pairingEphemeralKeyPair,
+      );
+      creds.advSecretKey = convertValueToBuffer(creds.advSecretKey);
+      for (const keyType in state.keys) {
+        for (const id in state.keys[keyType]) {
+          state.keys[keyType][id] = convertValueToBuffer(
+            state.keys[keyType][id],
+          );
+        }
+      }
+      return state;
+    };
+
+    const authStore: AuthStore = {
       state: {
-        creds: state.creds,
+        creds: internalState.creds,
         keys: {
           get: (type: string, ids: string[]) => {
-            const keyTypeData = state.keys?.[type] || {};
+            if (!internalState) return {};
+            const keyTypeData = internalState.keys?.[type] || {};
             return ids.reduce(
               (dict, id) => {
                 const value = keyTypeData[id];
@@ -309,156 +345,150 @@ export class WhatsappService implements OnModuleDestroy {
             );
           },
           set: (data: { [keyType: string]: { [id: string]: any } }) => {
+            if (!internalState) {
+              internalState = this.getInitialAuthState();
+            }
+            let keysChanged = false;
             for (const keyType in data) {
-              if (!state.keys[keyType]) state.keys[keyType] = {};
-              // Converte Uint8Array para Buffer se necessário
-              Object.keys(data[keyType]).forEach((id) => {
-                const value = data[keyType][id];
+              internalState.keys[keyType] = internalState.keys[keyType] || {};
+              for (const id in data[keyType]) {
+                let value = data[keyType][id];
                 if (value instanceof Uint8Array && !(value instanceof Buffer)) {
-                  state.keys[keyType][id] = Buffer.from(value);
-                } else {
-                  state.keys[keyType][id] = value;
+                  value = Buffer.from(value);
                 }
-              });
+                if (internalState.keys[keyType][id] !== value) {
+                  internalState.keys[keyType][id] = value;
+                  keysChanged = true;
+                }
+              }
+            }
+            if (keysChanged) {
+              internalState = { ...internalState };
+              this.logger.debug(
+                `[AuthStore ${userId}] Keys atualizadas no estado interno via SET.`,
+              );
             }
           },
         },
       },
       saveCreds: async () => {
-        await this.saveAuthState(userId, state);
+        if (!internalState) return;
+        internalState.creds = authStore.state.creds;
+        await this.saveAuthState(userId, internalState);
       },
       clearState: async () => {
-        state = {
-          creds: this.getInitialAuthState().creds,
-          keys: {},
-        };
+        this.logger.log(`[AuthStore ${userId}] clearState chamado.`);
+        internalState = this.getInitialAuthState();
+        authStore.state.creds = internalState.creds;
         await this.clearAuthState(userId);
       },
-      loadState: async () => {
-        state = await this.loadAuthState(userId);
-        // Converte Uint8Array para Buffer após carregar
-        if (state && state.creds) {
-          const creds = state.creds as any;
-          if (
-            creds.noiseKey?.private instanceof Uint8Array &&
-            !(creds.noiseKey.private instanceof Buffer)
-          ) {
-            creds.noiseKey.public = Buffer.from(creds.noiseKey.public);
-            creds.noiseKey.private = Buffer.from(creds.noiseKey.private);
-          }
-          if (creds.signedIdentityKey?.private instanceof Uint8Array) {
-            creds.signedIdentityKey.public = Buffer.from(
-              creds.signedIdentityKey.public,
-            );
-            creds.signedIdentityKey.private = Buffer.from(
-              creds.signedIdentityKey.private,
-            );
-          }
-          if (creds.signedPreKey?.keyPair?.private instanceof Uint8Array) {
-            creds.signedPreKey.keyPair.public = Buffer.from(
-              creds.signedPreKey.keyPair.public,
-            );
-            creds.signedPreKey.keyPair.private = Buffer.from(
-              creds.signedPreKey.keyPair.private,
-            );
-            creds.signedPreKey.signature = Buffer.from(
-              creds.signedPreKey.signature,
-            );
-          }
-          if (
-            creds.advSecretKey instanceof Uint8Array &&
-            !(creds.advSecretKey instanceof Buffer)
-          ) {
-            creds.advSecretKey = Buffer.from(creds.advSecretKey);
-          }
-          if (creds.pairingEphemeralKeyPair?.private instanceof Uint8Array) {
-            creds.pairingEphemeralKeyPair.public = Buffer.from(
-              creds.pairingEphemeralKeyPair.public,
-            );
-            creds.pairingEphemeralKeyPair.private = Buffer.from(
-              creds.pairingEphemeralKeyPair.private,
-            );
-          }
-        }
-        auth.state.creds = state.creds;
-        return state;
+      loadState: async (): Promise<void> => {
+        this.logger.debug(`[AuthStore ${userId}] loadState INICIADO.`);
+        let loaded = await this.loadAuthState(userId);
+        this.logger.debug(
+          `[AuthStore ${userId}] Estado carregado, aplicando ensureAllKeysAreBuffers...`,
+        );
+        loaded = ensureAllKeysAreBuffers(loaded);
+        this.logger.debug(
+          `[AuthStore ${userId}] Executado ensureAllKeysAreBuffers. Tipo noiseKey.private DEPOIS: ${loaded?.creds?.noiseKey?.private?.constructor?.name}`,
+        );
+        internalState = loaded;
+        authStore.state.creds = internalState.creds;
+        authStore.state.keys = internalState.keys as any; // Cast might be needed
+        this.logger.debug(`[AuthStore ${userId}] loadState FINALIZADO.`);
       },
     };
-
-    return auth;
+    return authStore;
   }
 
   async initializeSocketForUser(userId: number): Promise<void> {
     const existingSock = this.activeSockets.get(userId);
-
     if (existingSock?.user) {
-      this.logger.log(`Socket ativo reutilizado para usuário ${userId}`);
+      this.logger.log(`Socket ativo reutilizado para ${userId}`);
       this.whatsappGateway.sendStatusUpdate(userId, 'open');
       return;
     }
-
     if (existingSock) {
       try {
         existingSock.end(new Error('Recriando socket'));
       } catch (e) {
-        this.logger.debug(`Erro ao fechar socket anterior`);
+        /*ignore*/
       }
       this.activeSockets.delete(userId);
-      this.authStateCache.delete(userId);
     }
 
     this.logger.log(`Inicializando novo socket para usuário ${userId}`);
     this.whatsappGateway.sendStatusUpdate(userId, 'connecting');
 
     const authStore = this.createPrismaAuthStore(userId);
-    const { state, saveCreds, clearState } = authStore;
 
     try {
-      // Carregar estado existente antes de criar o socket
       await authStore.loadState();
+      this.logger.debug(
+        `[User ${userId}] authStore.loadState() concluído (com ensureBuffers).`,
+      );
 
-      let version: [number, number, number] = [2, 2345, 104];
-
+      let version: [number, number, number] | undefined = undefined;
+      const fetchTimeoutMs = 10000;
       try {
+        this.logger.log(`[User ${userId}] Buscando versão Baileys...`);
         const versionData = (await Promise.race([
           fetchLatestBaileysVersion(),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 5000),
+            setTimeout(
+              () => reject(new Error('Timeout buscando versão')),
+              fetchTimeoutMs,
+            ),
           ),
         ])) as { version: number[]; isLatest: boolean };
-
         if (
           Array.isArray(versionData.version) &&
           versionData.version.length >= 3
         ) {
           version = versionData.version.slice(0, 3) as [number, number, number];
+          this.logger.log(
+            `[User ${userId}] Usando versão Baileys: ${version.join('.')}`,
+          );
+        } else {
+          throw new Error('Versão inválida');
         }
       } catch (err) {
-        this.logger.warn(
-          `Usando versão padrão do Baileys: ${version.join('.')}`,
+        this.logger.error(
+          `[User ${userId}] Falha ao buscar versão: ${(err as Error).message}.`,
         );
+        this.whatsappGateway.sendStatusUpdate(userId, 'error');
+        return;
+      }
+      if (!version) {
+        this.logger.error(`[User ${userId}] Versão Baileys indeterminada.`);
+        this.whatsappGateway.sendStatusUpdate(userId, 'error');
+        return;
       }
 
       this.logger.log(
-        `[User ${userId}] Criando socket com Baileys v${version.join('.')}`,
+        `[User ${userId}] Criando socket com Baileys v${version.join('.')} usando authStore.state...`,
       );
 
       const sock = makeWASocket({
         version,
-        auth: {
-          creds: state.creds,
-          keys: makeCacheableSignalKeyStore(state.keys, loggerPino as any),
-        },
+        auth: authStore.state,
         printQRInTerminal: false,
         browser: Browsers.macOS('Chrome'),
         logger: loggerPino as any,
       });
 
       this.activeSockets.set(userId, sock);
+      console.log(`[GATEWAY] Socket inicializado para ${userId}`);
 
       sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-        this.logger.debug(`[User ${userId}] Connection Update: ${connection}`);
+        const errorMessage =
+          (lastDisconnect?.error as Boom)?.message ||
+          (lastDisconnect?.error as Error)?.message;
+        const errorStack = (lastDisconnect?.error as Error)?.stack;
+        this.logger.debug(
+          `[User ${userId}] Connection Update: ${connection}, LastDisconnect Error: ${errorMessage}`,
+        );
 
         if (qr) {
           this.logger.log(`QR Code gerado para usuário ${userId}`);
@@ -467,54 +497,64 @@ export class WhatsappService implements OnModuleDestroy {
             const qrDataURL = await qrcode.toDataURL(qr);
             this.whatsappGateway.sendQrToUser(userId, qrDataURL);
           } catch (err) {
-            this.logger.error(`Erro ao gerar QR Code`, (err as Error).stack);
+            this.logger.error(
+              `[User ${userId}] Erro ao gerar QR Code URL`,
+              (err as Error).stack,
+            );
           }
         }
 
         if (connection === 'close') {
           const statusCode = (lastDisconnect?.error as Boom)?.output
             ?.statusCode;
-          const shouldReconnect =
-            statusCode !== DisconnectReason.loggedOut &&
-            statusCode !== DisconnectReason.connectionClosed;
-
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
           this.logger.error(
-            `Conexão fechada para ${userId} | Código: ${statusCode}, Reconectar: ${shouldReconnect}`,
+            `Conexão fechada para ${userId} | Motivo: ${DisconnectReason[statusCode as number] || 'Desconhecido'} (${statusCode}) | Reconectando: ${shouldReconnect}`,
+            errorStack,
           );
-
           this.activeSockets.delete(userId);
-
           if (!shouldReconnect) {
-            this.logger.warn(`Logout permanente para usuário ${userId}`);
-            await clearState();
+            this.logger.warn(
+              `Logout permanente ou erro crítico (${statusCode}) para usuário ${userId}. Limpando estado.`,
+            );
+            await authStore.clearState();
             this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
           } else {
-            this.logger.log(`Tentando reconectar usuário ${userId}...`);
+            this.logger.log(
+              `Tentando reconectar usuário ${userId} em 5 segundos...`,
+            );
             this.whatsappGateway.sendStatusUpdate(userId, 'close');
-            // Aguardar antes de reconectar
             setTimeout(() => {
-              this.initializeSocketForUser(userId).catch((e) =>
-                this.logger.error(`Erro ao reconectar ${userId}`, e),
+              this.logger.log(
+                `[User ${userId}] Iniciando tentativa de reconexão...`,
               );
-            }, 3000);
+              this.initializeSocketForUser(userId).catch((e) =>
+                this.logger.error(
+                  `[User ${userId}] Erro CRÍTICO durante tentativa de reconexão`,
+                  (e as Error).stack,
+                ),
+              );
+            }, 5000);
           }
         } else if (connection === 'open') {
           this.logger.log(
             `WhatsApp conectado para usuário ${userId}: ${sock.user?.id}`,
           );
           this.whatsappGateway.sendStatusUpdate(userId, 'open');
+        } else if (connection === 'connecting') {
+          this.logger.log(`[User ${userId}] Socket está conectando...`);
         }
       });
 
-      sock.ev.on('creds.update', saveCreds);
+      sock.ev.on('creds.update', authStore.saveCreds);
     } catch (error) {
       this.logger.error(
-        `Erro ao inicializar socket para ${userId}`,
+        `Erro CRÍTICO durante inicialização para ${userId}`,
         (error as Error).stack,
       );
       this.activeSockets.delete(userId);
+      await authStore.clearState();
       this.whatsappGateway.sendStatusUpdate(userId, 'error');
-      throw error;
     }
   }
 
@@ -530,14 +570,9 @@ export class WhatsappService implements OnModuleDestroy {
     | null
   > {
     const sock = this.activeSockets.get(userId);
-
     if (sock) {
-      if (sock.user) {
-        return 'open';
-      }
-      return 'connecting';
+      return sock.user ? 'open' : 'connecting';
     }
-
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -546,10 +581,10 @@ export class WhatsappService implements OnModuleDestroy {
       return user?.whatsappSession ? 'close' : 'logged_out';
     } catch (e) {
       this.logger.error(
-        `Erro ao verificar estado do socket para ${userId}`,
+        `Erro ao verificar estado do socket para ${userId} no DB`,
         (e as Error).stack,
       );
-      return null;
+      return 'error';
     }
   }
 
@@ -559,33 +594,19 @@ export class WhatsappService implements OnModuleDestroy {
     text: string,
   ): Promise<any> {
     const sock = this.activeSockets.get(userId);
-
     if (!sock || !sock.user) {
-      this.logger.error(
-        `Socket não está pronto ou não conectado para o usuário ${userId}`,
-      );
       throw new Error(`WhatsApp não conectado para o usuário ${userId}.`);
     }
-
-    const numberOnly = targetNumber.replace(/[\s+()-]/g, '');
-
-    if (!numberOnly || !/^\+?\d{10,15}$/.test(numberOnly)) {
-      this.logger.error(`Número de telefone inválido: ${targetNumber}`);
-      throw new Error(`Número de telefone inválido: ${targetNumber}`);
+    const numberOnly = targetNumber.replace(/\D/g, '');
+    if (!numberOnly || numberOnly.length < 10 || numberOnly.length > 15) {
+      throw new Error(`Número inválido: ${targetNumber}`);
     }
-
     const jid = `${numberOnly}@s.whatsapp.net`;
-
     if (!/^\d+@s\.whatsapp\.net$/.test(jid)) {
-      this.logger.error(
-        `Número de telefone inválido ou mal formatado para JID: ${targetNumber} -> ${jid}`,
-      );
-      throw new Error(`Número de telefone inválido: ${targetNumber}`);
+      throw new Error(`Falha ao formatar número: ${targetNumber}`);
     }
-
     try {
-      this.logger.debug(`Enviando mensagem para ${jid} pelo usuário ${userId}`);
-      const result = await sock.sendMessage(jid, { text });
+      const result = await sock.sendMessage(jid, { text: text });
       this.logger.log(
         `Mensagem enviada para ${jid} pelo usuário ${userId}. ID: ${result?.key?.id}`,
       );
@@ -596,46 +617,53 @@ export class WhatsappService implements OnModuleDestroy {
         (error as Error).stack,
       );
       throw new Error(
-        `Falha ao enviar mensagem WhatsApp: ${(error as Error).message || error}`,
+        `Falha ao enviar mensagem WhatsApp: ${(error as Error).message || 'Erro desconhecido'}`,
       );
     }
   }
 
   async disconnectUser(userId: number): Promise<void> {
     const sock = this.activeSockets.get(userId);
-
+    const authStore = this.createPrismaAuthStore(userId);
     if (sock) {
       this.logger.log(`Tentando desconectar usuário ${userId}...`);
       try {
-        await this.clearAuthState(userId);
         await sock.logout(`Desconectado pelo usuário via App.`);
-        this.logger.log(`Logout solicitado para ${userId}.`);
-      } catch (error) {
-        this.logger.error(
-          `Erro durante o logout para ${userId}, forçando fechamento:`,
-          (error as Error).stack,
+      } catch (logoutError) {
+        this.logger.warn(
+          `Erro durante sock.logout() para ${userId}:`,
+          (logoutError as Error).message,
         );
-        try {
-          sock.end(
-            new Error(
-              `Forçando desconexão após erro no logout: ${(error as Error).message}`,
-            ),
-          );
-        } catch (e) {
-          this.logger.debug(
-            `Erro ao forçar fechamento do socket: ${(e as Error).message}`,
-          );
-        }
       } finally {
-        this.activeSockets.delete(userId);
+        await authStore.clearState();
+        this.logger.log(
+          `Estado de autenticação limpo para ${userId} após tentativa de desconexão.`,
+        );
+        if (this.activeSockets.has(userId)) {
+          try {
+            this.logger.log(
+              `Forçando encerramento da conexão WebSocket para ${userId}.`,
+            );
+            sock.end(
+              new Error('Desconexão solicitada pelo usuário e estado limpo.'),
+            );
+          } catch (endError) {
+            this.logger.error(
+              `Erro ao forçar encerramento para ${userId}:`,
+              (endError as Error).message,
+            );
+          }
+          this.activeSockets.delete(userId);
+        }
         this.authStateCache.delete(userId);
         this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
       }
     } else {
       this.logger.warn(
-        `Nenhum socket ativo encontrado para desconectar usuário ${userId}, limpando estado do DB.`,
+        `Nenhum socket ativo para desconectar ${userId}, limpando estado.`,
       );
-      await this.clearAuthState(userId);
+      await authStore.clearState();
+      this.authStateCache.delete(userId);
       this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
     }
   }

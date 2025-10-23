@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
-import { WhatsappService } from '../whatsapp/whatsapp.service'; // Importar WhatsappService
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class NotificationService {
@@ -13,31 +13,23 @@ export class NotificationService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
-    private whatsappService: WhatsappService, // Injetar WhatsappService
+    private whatsappService: WhatsappService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_8AM) // Ou ajuste o horário
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
   async handleDailySummary() {
     this.logger.log('Rodando resumo diário...');
-
     const usersToNotify = await this.prisma.user.findMany({
       where: {
-        OR: [
-          { notifyDailySummary: true },
-          { notifyViaWhatsApp: true }, // Inclui usuários que querem via WhatsApp
-        ],
+        OR: [{ notifyDailySummary: true }, { notifyViaWhatsApp: true }],
       },
     });
 
     for (const user of usersToNotify) {
-      // Pega tarefas independentemente da preferência de notificação primeiro
       const pendingTasks = await this.prisma.task.findMany({
-        where: {
-          status: { not: 'DONE' },
-          board: { userId: user.id },
-        },
+        where: { status: { not: 'DONE' }, board: { userId: user.id } },
         include: { board: true },
-        orderBy: { createdAt: 'asc' }, // Ordena para consistência
+        orderBy: { createdAt: 'asc' },
       });
 
       if (pendingTasks.length > 0) {
@@ -46,9 +38,7 @@ export class NotificationService {
           messageText += `• [${task.board.name}] ${task.title} (${task.status})\n`;
         });
 
-        // Enviar Email se habilitado
         if (user.notifyDailySummary) {
-          // Verifica a preferência de email
           this.logger.log(
             `Enviando resumo diário por EMAIL para ${user.email}`,
           );
@@ -56,10 +46,9 @@ export class NotificationService {
             .sendEmail(user.email, 'Seu Resumo Diário - DevDeck', messageText)
             .catch((e) =>
               this.logger.error(`Falha ao enviar email para ${user.email}`, e),
-            ); // Adiciona catch
+            );
         }
 
-        // Enviar WhatsApp se habilitado e número existir
         if (user.notifyViaWhatsApp && user.whatsappNumber) {
           this.logger.log(
             `Enviando resumo diário por WHATSAPP para ${user.whatsappNumber}`,
@@ -72,38 +61,31 @@ export class NotificationService {
             );
           } catch (error) {
             this.logger.error(
-              `Falha ao enviar WhatsApp para ${user.whatsappNumber} (User ID: ${user.id}): ${error.message}`,
+              `Falha ao enviar WhatsApp para ${user.whatsappNumber} (User ID: ${user.id}): ${(error as Error).message}`,
             );
-            // Considerar notificar o usuário por outro meio sobre a falha ou desativar temporariamente
           }
         }
       }
     }
   }
 
-  @Cron(CronExpression.EVERY_HOUR) // Ou ajuste a frequência
+  @Cron(CronExpression.EVERY_HOUR)
   async handleStaleTasks() {
     this.logger.log('Verificando tarefas paradas...');
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-
     const tasksToNotify = await this.prisma.task.findMany({
       where: {
         status: 'DOING',
         updatedAt: { lt: twoDaysAgo },
         board: {
           user: {
-            // Notifica se qualquer uma das opções estiver ativa
-            OR: [
-              { notifyStaleTasks: true },
-              { notifyViaWhatsApp: true }, // Para pegar o número se for enviar via WhatsApp
-            ],
+            OR: [{ notifyStaleTasks: true }, { notifyViaWhatsApp: true }],
           },
         },
       },
       include: { board: { include: { user: true } } },
     });
 
-    // Agrupa tarefas por usuário para enviar uma única mensagem por usuário
     const notificationsByUser = new Map<
       number,
       {
@@ -111,7 +93,6 @@ export class NotificationService {
         tasks: typeof tasksToNotify;
       }
     >();
-
     for (const task of tasksToNotify) {
       const userId = task.board.userId;
       if (!notificationsByUser.has(userId)) {
@@ -126,7 +107,6 @@ export class NotificationService {
         messageText += `• [${task.board.name}] ${task.title}\n`;
       });
 
-      // Enviar Email se habilitado
       if (user.notifyStaleTasks) {
         this.logger.log(
           `Notificando ${user.email} (EMAIL) sobre ${tasks.length} tarefa(s) parada(s).`,
@@ -145,7 +125,6 @@ export class NotificationService {
           );
       }
 
-      // Enviar WhatsApp se habilitado E número existir
       if (user.notifyViaWhatsApp && user.whatsappNumber) {
         this.logger.log(
           `Notificando ${user.whatsappNumber} (WHATSAPP) sobre ${tasks.length} tarefa(s) parada(s).`,
@@ -158,16 +137,15 @@ export class NotificationService {
           );
         } catch (error) {
           this.logger.error(
-            `Falha ao enviar WhatsApp (stale) para ${user.whatsappNumber} (User ID: ${user.id}): ${error.message}`,
+            `Falha ao enviar WhatsApp (stale) para ${user.whatsappNumber} (User ID: ${user.id}): ${(error as Error).message}`,
           );
         }
       }
 
-      // Atualiza TODAS as tarefas notificadas para evitar spam na próxima hora
       const taskIdsToUpdate = tasks.map((t) => t.id);
       await this.prisma.task.updateMany({
         where: { id: { in: taskIdsToUpdate } },
-        data: { updatedAt: new Date() }, // Atualiza o timestamp
+        data: { updatedAt: new Date() },
       });
     }
   }

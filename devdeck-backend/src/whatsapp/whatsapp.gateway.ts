@@ -10,12 +10,12 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { WhatsappService } from './whatsapp.service';
-import { fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 
 async function validateToken(
   client: Socket,
@@ -25,20 +25,34 @@ async function validateToken(
     process.env.JWT_SECRET ||
     'sk_jwt_7x9A2qB8vR3tY6wE1zC5nM8pQ0sK3jH7gF4dL9oV2cX6rT1yU5iW8aB0eN3mZ7qP';
   const token = client.handshake.auth?.token;
-  if (!token) return null;
+  if (!token) {
+    console.warn(
+      '[GATEWAY] Token não encontrado na autenticação do handshake.',
+    );
+    return null;
+  }
   try {
     const payload = await jwtService.verifyAsync(token, { secret: jwtSecret });
-    return payload.sub;
+    if (payload && typeof payload.sub === 'number') {
+      return payload.sub;
+    } else {
+      console.warn(
+        '[GATEWAY] Payload do token inválido ou sem `sub`. Payload:',
+        payload,
+      );
+      return null;
+    }
   } catch (e) {
-    console.error('Erro ao validar token WebSocket:', (e as Error).message);
+    console.error(
+      '[GATEWAY] Erro ao validar token WebSocket:',
+      (e as Error).message,
+    );
     return null;
   }
 }
 
 @WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
+  cors: { origin: '*' },
   namespace: '/whatsapp',
 })
 export class WhatsappGateway
@@ -58,107 +72,157 @@ export class WhatsappGateway
     const userId = await validateToken(client, this.jwtService);
     if (!userId) {
       this.logger.warn(`Cliente WS não autenticado desconectado: ${client.id}`);
-      console.warn(`[GATEWAY] Cliente não autenticado: ${client.id}`);
+      console.warn(
+        `[GATEWAY] Cliente não autenticado desconectado: ${client.id}`,
+      );
       client.disconnect(true);
       return;
     }
-    this.logger.log(`Cliente conectado: ${client.id}, Usuário: ${userId}`);
+
+    const existingSocketId = this.connectedUsers.get(userId);
+    if (existingSocketId && existingSocketId !== client.id) {
+      this.logger.warn(
+        `Usuário ${userId} conectou novamente (${client.id}). Desconectando socket antigo (${existingSocketId}).`,
+      );
+      const oldSocket = this.server.sockets.sockets.get(existingSocketId);
+      if (oldSocket) {
+        oldSocket.disconnect(true);
+      }
+    }
+
+    this.logger.log(
+      `Cliente conectado: ${client.id}, Associado ao Usuário: ${userId}`,
+    );
     console.log(
       `[GATEWAY] Cliente conectado: ${client.id}, Usuário: ${userId}`,
     );
     this.connectedUsers.set(userId, client.id);
 
-    this.whatsappService
-      .getSocketState(userId)
-      .then((state) => {
-        if (state) {
-          console.log(
-            `[GATEWAY] Enviando estado inicial ${state} para usuário ${userId}`,
-          );
-          this.sendStatusUpdate(userId, state);
-        }
-      })
-      .catch((e) =>
-        this.logger.error(`Erro ao obter estado inicial para ${userId}`, e),
+    try {
+      const state = await this.whatsappService.getSocketState(userId);
+      if (state) {
+        console.log(
+          `[GATEWAY] Enviando estado inicial ${state} para usuário ${userId} (${client.id})`,
+        );
+        client.emit('whatsapp_status_update', { status: state });
+      }
+    } catch (e) {
+      this.logger.error(
+        `Erro ao obter/enviar estado inicial para ${userId}`,
+        (e as Error).stack,
       );
+    }
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Cliente desconectado: ${client.id}`);
-    console.log(`[GATEWAY] Cliente desconectado: ${client.id}`);
+    let disconnectedUserId: number | null = null;
     for (const [userId, socketId] of this.connectedUsers.entries()) {
       if (socketId === client.id) {
+        disconnectedUserId = userId;
         this.connectedUsers.delete(userId);
-        this.logger.log(`Usuário ${userId} removido do mapa de conexões WS.`);
-        console.log(`[GATEWAY] Usuário ${userId} removido`);
         break;
       }
+    }
+    if (disconnectedUserId) {
+      this.logger.log(
+        `Cliente desconectado: ${client.id}, Usuário ${disconnectedUserId} removido do mapa.`,
+      );
+      console.log(
+        `[GATEWAY] Cliente desconectado: ${client.id}, Usuário ${disconnectedUserId} removido.`,
+      );
+    } else {
+      this.logger.log(
+        `Cliente desconectado: ${client.id} (não estava mapeado para um usuário).`,
+      );
+      console.log(
+        `[GATEWAY] Cliente desconectado: ${client.id} (não mapeado).`,
+      );
     }
   }
 
   @SubscribeMessage('request_whatsapp_connect')
   async handleConnectRequest(@ConnectedSocket() client: Socket) {
     const userId = await validateToken(client, this.jwtService);
-    if (!userId) return { error: 'Não autenticado' };
-
-    // Defina um valor padrão para version
-    let version: [number, number, number] = [2, 2323, 4]; // Substitua pelos valores padrão corretos se necessário
-    try {
-      // Força sempre buscar a versão mais recente
-      const versionData = await fetchLatestBaileysVersion();
-      version = (versionData.version as number[]).slice(0, 3) as [
-        number,
-        number,
-        number,
-      ];
-      this.logger.log(
-        `[User ${userId}] Versão do Baileys obtida: ${version.join('.')}`,
+    if (!userId) {
+      this.logger.warn(
+        `[GATEWAY] request_whatsapp_connect: Cliente não autenticado ${client.id}`,
       );
-    } catch (err) {
-      this.logger.warn(`Usando versão padrão do Baileys: ${version.join('.')}`);
+      return { error: 'Não autenticado' };
+    }
+
+    this.logger.log(
+      `[GATEWAY] Solicitação de conexão WhatsApp recebida para usuário ${userId} (${client.id})`,
+    );
+    console.log(
+      `[GATEWAY] Connect request do usuário ${userId} (${client.id})`,
+    );
+
+    try {
+      this.whatsappService.initializeSocketForUser(userId);
+      return { success: true, message: 'Iniciando conexão...' };
+    } catch (error) {
+      this.logger.error(
+        `[GATEWAY] Erro ao chamar initializeSocketForUser para ${userId}:`,
+        (error as Error).stack,
+      );
+      return { error: 'Falha ao iniciar conexão com WhatsApp.' };
     }
   }
 
   @SubscribeMessage('disconnect_whatsapp')
   async handleDisconnectRequest(@ConnectedSocket() client: Socket) {
     const userId = await validateToken(client, this.jwtService);
-    if (!userId) return { error: 'Não autenticado' };
+    if (!userId) {
+      this.logger.warn(
+        `[GATEWAY] disconnect_whatsapp: Cliente não autenticado ${client.id}`,
+      );
+      return { error: 'Não autenticado' };
+    }
 
     this.logger.log(
-      `Solicitação de desconexão WhatsApp recebida para usuário ${userId}`,
+      `[GATEWAY] Solicitação de desconexão WhatsApp recebida para usuário ${userId} (${client.id})`,
     );
-    console.log(`[GATEWAY] Disconnect request do usuário ${userId}`);
+    console.log(
+      `[GATEWAY] Disconnect request do usuário ${userId} (${client.id})`,
+    );
 
     try {
       await this.whatsappService.disconnectUser(userId);
-      console.log(`[GATEWAY] Desconectado: ${userId}`);
+      console.log(`[GATEWAY] Desconexão iniciada para: ${userId}`);
       return { success: true, message: 'Desconectando...' };
     } catch (error) {
-      this.logger.error(`Erro ao desconectar usuário ${userId}:`, error);
-      console.error(
-        `[GATEWAY] Erro ao desconectar: ${(error as Error).message}`,
+      this.logger.error(
+        `[GATEWAY] Erro ao processar desconexão para ${userId}:`,
+        (error as Error).stack,
       );
-      return { error: (error as Error).message || 'Erro ao desconectar' };
+      console.error(
+        `[GATEWAY] Erro ao desconectar ${userId}: ${(error as Error).message}`,
+      );
+      this.sendStatusUpdate(userId, 'error');
+      return {
+        error: (error as Error).message || 'Erro ao tentar desconectar',
+      };
     }
   }
 
   sendQrToUser(userId: number, qrDataUrl: string) {
     const socketId = this.connectedUsers.get(userId);
     console.log(
-      `[GATEWAY] Tentando enviar QR para ${userId}, socket: ${socketId}`,
+      `[GATEWAY] Tentando enviar QR para ${userId}, socket ID: ${socketId}`,
     );
-
     if (socketId) {
-      console.log(`[GATEWAY] Enviando QR code para usuário ${userId}`);
       this.server.to(socketId).emit('whatsapp_qr_code', qrDataUrl);
       this.logger.log(
         `QR Code enviado para usuário ${userId} (socket ${socketId})`,
       );
+      console.log(`[GATEWAY] QR Code enviado para usuário ${userId}`);
     } else {
       this.logger.warn(
-        `Socket não encontrado para usuário ${userId} ao enviar QR`,
+        `Socket não encontrado para usuário ${userId} ao tentar enviar QR Code.`,
       );
-      console.warn(`[GATEWAY] Socket não encontrado para ${userId}`);
+      console.warn(
+        `[GATEWAY] Socket não encontrado para ${userId} ao enviar QR`,
+      );
     }
   }
 
@@ -174,21 +238,21 @@ export class WhatsappGateway
   ) {
     const socketId = this.connectedUsers.get(userId);
     const payload = { status };
-
     console.log(
-      `[GATEWAY] Enviando status ${status} para usuário ${userId}, socket: ${socketId}`,
+      `[GATEWAY] Enviando status '${status}' para usuário ${userId}, socket ID: ${socketId}`,
     );
-
     if (socketId) {
       this.server.to(socketId).emit('whatsapp_status_update', payload);
-      this.logger.log(`Status '${status}' enviado para usuário ${userId}`);
-      console.log(`[GATEWAY] Status ${status} enviado para ${userId}`);
+      this.logger.log(
+        `Status '${status}' enviado para usuário ${userId} (socket ${socketId})`,
+      );
+      console.log(`[GATEWAY] Status '${status}' enviado para ${userId}`);
     } else {
       this.logger.warn(
-        `Socket não encontrado para usuário ${userId} ao enviar status ${status}`,
+        `Socket não encontrado para usuário ${userId} ao tentar enviar status '${status}'.`,
       );
       console.warn(
-        `[GATEWAY] Socket não encontrado para enviar status para ${userId}`,
+        `[GATEWAY] Socket não encontrado para enviar status '${status}' para ${userId}`,
       );
     }
   }
