@@ -190,13 +190,53 @@ function logout() {
 }
 async function updateUserSettings(settingsData) {
     try {
-        const updatedUser = await fetchApi('/user/settings', { method: 'PATCH', body: JSON.stringify(settingsData) });
+        // Inclui SEMPRE os campos relacionados ao WhatsApp se eles existem no DTO
+        const payload = {
+            notifyDailySummary: currentUserSettings.notifyDailySummary,
+            notifyStaleTasks: currentUserSettings.notifyStaleTasks,
+            notifyViaWhatsApp: currentUserSettings.notifyViaWhatsApp,
+            whatsappNumber: currentUserSettings.whatsappNumber,
+            ...settingsData // Sobrescreve com os dados que realmente mudaram
+        };
+
+        // Validação simples do número antes de enviar (melhorar com regex se necessário)
+        if (payload.whatsappNumber && !payload.whatsappNumber.startsWith('+')) {
+            showAlert('Número do WhatsApp deve iniciar com + e código do país (Ex: +5519...).');
+            updateToggleUI(); // Reverte UI
+            return;
+        }
+         if (payload.notifyViaWhatsApp && !payload.whatsappNumber) {
+              showAlert('É necessário confirmar seu número de WhatsApp para ativar as notificações.');
+              payload.notifyViaWhatsApp = false; // Desativa se não houver número
+              currentUserSettings.notifyViaWhatsApp = false; // Atualiza estado local
+              updateToggleUI(); // Reverte UI do toggle
+              // Não envia a atualização ainda, espera o número
+              return;
+         }
+
+
+        const updatedUser = await fetchApi('/user/settings', {
+             method: 'PATCH',
+             body: JSON.stringify(payload)
+        });
+
+        // Atualiza estado local com a resposta do servidor
         currentUserSettings.notifyDailySummary = updatedUser.notifyDailySummary;
         currentUserSettings.notifyStaleTasks = updatedUser.notifyStaleTasks;
+        currentUserSettings.notifyViaWhatsApp = updatedUser.notifyViaWhatsApp;
+        currentUserSettings.whatsappNumber = updatedUser.whatsappNumber;
+
         console.log('Configurações atualizadas:', updatedUser);
+        updateToggleUI(); // Garante que a UI reflita o estado salvo
+
     } catch (error) {
         console.error('Falha ao salvar configurações:', error);
-        updateToggleUI(); // Reverte UI se falhar
+        showAlert(`Erro ao salvar configurações: ${error.message}`);
+        // Recarrega as configurações do backend para garantir consistência?
+        // Ou apenas reverte a UI para o estado anterior? Por ora, reverte a UI.
+        // É preciso buscar as configurações novamente para ter certeza.
+        // Vamos apenas reverter a UI por enquanto.
+        updateToggleUI();
     }
 }
 async function getBoards() { return await fetchApi('/boards'); }
@@ -211,10 +251,120 @@ async function deleteBoard(boardId) { return await fetchApi(`/boards/${boardId}`
 // --- Funções Auxiliares ---
 function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(' '); if (parts.length > 1 && parts[parts.length - 1]) { return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase(); } return name.substring(0, 2).toUpperCase(); }
 function generateAvatarColor(seed) { let hash = 0; if (!seed || seed.length === 0) return '#4a517e'; for (let i = 0; i < seed.length; i++) { hash = seed.charCodeAt(i) + ((hash << 5) - hash); } const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6']; return colors[Math.abs(hash) % colors.length]; }
-function updateToggleUI() { toggleDailySummary.checked = !!currentUserSettings.notifyDailySummary; toggleStaleTasks.checked = !!currentUserSettings.notifyStaleTasks; }
+function updateToggleUI() { toggleDailySummary.checked = !!currentUserSettings.notifyDailySummary; toggleStaleTasks.checked = !!currentUserSettings.notifyStaleTasks; toggleWhatsApp.checked = !!currentUserSettings.notifyViaWhatsApp;
+    whatsappNumberInput.value = currentUserSettings.whatsappNumber || '';}
+
+function connectWebSocket() {
+    if (socket && socket.connected) {
+        console.log('WebSocket já conectado.');
+        return;
+    }
+
+    console.log('Tentando conectar WebSocket...');
+    // Inclui o token JWT para autenticação no backend gateway
+    socket = io(WS_URL, {
+        auth: {
+            token: authToken
+        },
+        reconnectionAttempts: 5, // Tenta reconectar algumas vezes
+        transports: ['websocket'] // Força WebSocket
+    });
+
+    socket.on('connect', () => {
+        console.log('WebSocket Conectado:', socket.id);
+        // Solicita o status atual do WhatsApp ao conectar
+         socket.emit('request_whatsapp_status'); // Precisa implementar este handler no backend se quiser status imediato
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.warn('WebSocket Desconectado:', reason);
+        // Poderia tentar reconectar manualmente ou notificar o usuário
+        updateWhatsappUI('Desconectado (Socket)'); // Atualiza UI localmente
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Erro de conexão WebSocket:', err.message);
+        updateWhatsappUI('Erro de Conexão');
+    });
+
+    // Eventos específicos do WhatsApp vindos do Gateway
+    socket.on('whatsapp_qr_code', (qrDataUrl) => {
+        console.log('QR Code recebido');
+        whatsappQrCodeImg.src = qrDataUrl;
+        whatsappQrContainer.classList.remove('hidden');
+        whatsappStatusText.textContent = 'Status: Escaneie o QR Code';
+        whatsappConnectBtn.classList.add('hidden');
+        whatsappDisconnectBtn.classList.remove('hidden'); // Permite cancelar
+    });
+
+    socket.on('whatsapp_status_update', (payload) => {
+        const status = payload.status;
+        console.log('Status WhatsApp recebido:', status);
+        updateWhatsappUI(status);
+    });
+}
+
+function disconnectWebSocket() {
+    if (socket) {
+        console.log('Desconectando WebSocket...');
+        socket.disconnect();
+        socket = null;
+    }
+}
+
+// Atualiza a UI da seção WhatsApp
+function updateWhatsappUI(status) {
+    whatsappQrContainer.classList.add('hidden'); // Esconde QR por padrão
+    whatsappQrCodeImg.src = '';
+
+    switch (status) {
+        case 'connecting':
+            whatsappStatusText.textContent = 'Status: Conectando...';
+            whatsappConnectBtn.classList.add('hidden');
+            whatsappDisconnectBtn.classList.remove('hidden');
+            whatsappDisconnectBtn.disabled = true; // Desabilita enquanto conecta
+            break;
+        case 'open':
+            whatsappStatusText.textContent = 'Status: Conectado';
+            whatsappConnectBtn.classList.add('hidden');
+            whatsappDisconnectBtn.classList.remove('hidden');
+             whatsappDisconnectBtn.disabled = false;
+            break;
+        case 'request_qr':
+             // O QR será exibido pelo handler 'whatsapp_qr_code'
+             whatsappStatusText.textContent = 'Status: Escaneie o QR Code';
+            whatsappConnectBtn.classList.add('hidden');
+            whatsappDisconnectBtn.classList.remove('hidden');
+             whatsappDisconnectBtn.disabled = false;
+            break;
+        case 'close':
+            whatsappStatusText.textContent = 'Status: Desconectado';
+            whatsappConnectBtn.classList.remove('hidden');
+            whatsappDisconnectBtn.classList.add('hidden');
+             whatsappDisconnectBtn.disabled = false;
+            break;
+         case 'logged_out':
+             whatsappStatusText.textContent = 'Status: Deslogado';
+             whatsappConnectBtn.classList.remove('hidden');
+             whatsappDisconnectBtn.classList.add('hidden');
+             whatsappDisconnectBtn.disabled = false;
+             break;
+         case 'error':
+            whatsappStatusText.textContent = 'Status: Erro';
+            whatsappConnectBtn.classList.remove('hidden');
+            whatsappDisconnectBtn.classList.add('hidden');
+            whatsappDisconnectBtn.disabled = false;
+             break;
+         default:
+             whatsappStatusText.textContent = `Status: ${status}`; // Status desconhecido ou customizado
+             whatsappConnectBtn.classList.remove('hidden'); // Mostra conectar por segurança
+             whatsappDisconnectBtn.classList.add('hidden');
+             whatsappDisconnectBtn.disabled = false;
+    }
+}
 
 // --- Controle de Views ---
-function showLoginView() { appContainer.classList.add('hidden'); authSection.classList.remove('hidden'); loginView.classList.remove('hidden'); signupView.classList.add('hidden'); userMenu.classList.add('hidden'); loginError.classList.add('hidden'); signupError.classList.add('hidden'); }
+function showLoginView() { appContainer.classList.add('hidden'); authSection.classList.remove('hidden'); loginView.classList.remove('hidden'); signupView.classList.add('hidden'); userMenu.classList.add('hidden'); loginError.classList.add('hidden'); signupError.classList.add('hidden'); disconnectWebSocket();}
 function showSignupView() { appContainer.classList.add('hidden'); authSection.classList.remove('hidden'); loginView.classList.add('hidden'); signupView.classList.remove('hidden'); userMenu.classList.add('hidden'); loginError.classList.add('hidden'); signupError.classList.add('hidden'); }
 function showKanbanView() {
     authSection.classList.add('hidden');
@@ -231,6 +381,7 @@ function showKanbanView() {
     userDropdownEmail.textContent = email;
     updateToggleUI();
     loadInitialData();
+    connectWebSocket();
 }
 
 // --- Renderização Kanban ---
@@ -449,7 +600,44 @@ async function loadInitialData(selectId=null) {
 showSignupLink.addEventListener('click', showSignupView);
 showLoginLink.addEventListener('click', showLoginView);
 logoutButton.addEventListener('click', logout);
+whatsappConnectBtn.addEventListener('click', () => {
+    if (socket && socket.connected) {
+        whatsappStatusText.textContent = 'Status: Solicitando conexão...';
+        socket.emit('request_whatsapp_connect');
+    } else {
+        showAlert('Conexão WebSocket não estabelecida. Tentando reconectar...');
+        connectWebSocket(); // Tenta reconectar o socket principal primeiro
+    }
+});
 
+whatsappDisconnectBtn.addEventListener('click', () => {
+    if (socket && socket.connected) {
+        whatsappStatusText.textContent = 'Status: Desconectando...';
+        socket.emit('disconnect_whatsapp');
+    } else {
+        // Se o socket não está conectado, apenas atualiza a UI e talvez limpe localmente
+         updateWhatsappUI('logged_out'); // Ou 'close' se preferir
+         // Considerar limpar o número salvo localmente também?
+         // currentUserSettings.whatsappNumber = null;
+         // updateUserSettings({ whatsappNumber: null, notifyViaWhatsApp: false }); // Ou apenas local
+         console.warn("Socket não conectado, desconexão não enviada ao backend.");
+    }
+});
+
+// Listener para salvar o número confirmado e a preferência de notificação
+whatsappNumberInput.addEventListener('change', (e) => {
+    const newNumber = e.target.value.trim();
+    if (currentUserSettings.whatsappNumber !== newNumber) {
+        currentUserSettings.whatsappNumber = newNumber || null; // Salva null se vazio
+        updateUserSettings({ whatsappNumber: currentUserSettings.whatsappNumber });
+    }
+});
+
+toggleWhatsApp.addEventListener('change', (e) => {
+    const wantsWhatsApp = e.target.checked;
+    currentUserSettings.notifyViaWhatsApp = wantsWhatsApp;
+    updateUserSettings({ notifyViaWhatsApp: wantsWhatsApp }); // Salva a preferência
+});
 // Toggle do Menu de Usuário
 userMenuButton.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -526,28 +714,30 @@ boardForm.addEventListener('submit', handleBoardFormSubmit);
 boardModalCancelButton.addEventListener('click', closeBoardModal);
 
 // --- Inicialização Geral ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => { // Tornar async
     authToken = localStorage.getItem(TOKEN_KEY);
     currentUserEmail = localStorage.getItem(USER_EMAIL_KEY);
     currentUserName = localStorage.getItem(USER_NAME_KEY);
-    
+
     if (authToken) {
-        fetchApi('/user/me')
-            .then(user => {
-                currentUserEmail = user.email;
-                currentUserName = user.name;
-                currentUserSettings = {
-                    notifyDailySummary: user.notifyDailySummary,
-                    notifyStaleTasks: user.notifyStaleTasks
-                };
-                localStorage.setItem(USER_EMAIL_KEY, currentUserEmail);
-                localStorage.setItem(USER_NAME_KEY, currentUserName);
-                showKanbanView();
-            })
-            .catch(err => {
-                console.error("Erro ao buscar /user/me:", err);
-                if (!authToken) showLoginView();
-            });
+        try {
+            const user = await fetchApi('/user/me'); // Espera a resposta
+            currentUserEmail = user.email;
+            currentUserName = user.name;
+            currentUserSettings = { // Carrega TODAS as configurações
+                notifyDailySummary: user.notifyDailySummary,
+                notifyStaleTasks: user.notifyStaleTasks,
+                notifyViaWhatsApp: user.notifyViaWhatsApp, // Carrega do backend
+                whatsappNumber: user.whatsappNumber,     // Carrega do backend
+            };
+            localStorage.setItem(USER_EMAIL_KEY, currentUserEmail);
+            localStorage.setItem(USER_NAME_KEY, currentUserName);
+            // NÃO salvar whatsappNumber ou notifyViaWhatsApp no localStorage
+            showKanbanView();
+        } catch (err) {
+            console.error("Erro ao buscar /user/me ou token inválido:", err);
+            logout(); // Faz logout se o token for inválido
+        }
     } else {
         showLoginView();
     }

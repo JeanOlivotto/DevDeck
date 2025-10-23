@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, User } from '@prisma/client'; // Importe User se precisar do tipo
@@ -31,17 +34,46 @@ export class UserService {
   async updateSettings(
     userId: number,
     settings: UpdateUserSettingsDto,
-  ): Promise<Omit<User, 'password'>> {
+  ): Promise<Omit<User, 'password' | 'whatsappSession'>> {
+    // Omitir whatsappSession
+    // Verifica se o usuário existe
+    const userExists = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!userExists) {
+      throw new NotFoundException(`Usuário com ID ${userId} não encontrado.`);
+    }
+
+    // Validação extra: Se notifyViaWhatsApp é true, whatsappNumber não pode ser null/vazio
+    if (settings.notifyViaWhatsApp === true) {
+      // Se o número não está sendo atualizado agora, busca o atual no banco
+      const currentNumber =
+        settings.whatsappNumber ?? userExists.whatsappNumber;
+      if (!currentNumber) {
+        throw new InternalServerErrorException(
+          'É necessário fornecer um número de WhatsApp para ativar as notificações.',
+        );
+      }
+      // Atualiza o número no DTO se ele foi buscado do banco, para garantir que seja salvo
+      if (!settings.whatsappNumber && currentNumber) {
+        settings.whatsappNumber = currentNumber;
+      }
+    }
+    // Se está desativando as notificações, NÃO limpar o número automaticamente
+    // if (settings.notifyViaWhatsApp === false) {
+    //     settings.whatsappNumber = null; // Ou manter o número salvo
+    // }
+
     try {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
-        data: settings,
+        data: settings, // Salva todas as configurações passadas
       });
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = updatedUser;
+      const { password, whatsappSession, ...result } = updatedUser; // Remover whatsappSession da resposta
       return result;
     } catch (error) {
-      this.logger?.error?.(
+      this.logger.error(
         `Erro ao atualizar configurações do usuário ${userId}`,
         error,
       );

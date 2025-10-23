@@ -13,6 +13,7 @@ import { EmailService } from './email/email.service';
 import { NotificationModule } from './notification/notification.module';
 import { NotificationService } from './notification/notification.service';
 import { ConfigModule } from '@nestjs/config';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ConfigModule } from '@nestjs/config';
     AuthModule,
     EmailModule,
     NotificationModule,
+    WhatsappModule,
   ],
   controllers: [AuthController, UserController],
   providers: [UserService, AuthService, EmailService, NotificationService],

@@ -1,4 +1,9 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+} from 'class-validator';
 
 export class UpdateUserSettingsDto {
   @IsBoolean()
@@ -8,4 +13,13 @@ export class UpdateUserSettingsDto {
   @IsBoolean()
   @IsOptional()
   notifyStaleTasks?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  notifyViaWhatsApp?: boolean;
+
+  @IsPhoneNumber('BR')
+  @IsString()
+  @IsOptional()
+  whatsappNumber?: string;
 }

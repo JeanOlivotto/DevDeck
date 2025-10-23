@@ -67,8 +67,31 @@
                          </div>
                      </label>
                  </div>
-                 <div class="p-2">
-                     <button id="logout-button" class="w-full text-center p-2 rounded hover:bg-red-700/50 text-red-400 transition-colors">
+                 <div class="p-4 border-b border-gray-700 space-y-3">
+                     <h4 class="text-sm font-semibold text-gray-400 mb-2">Notificações WhatsApp</h4>
+                     <label for="toggle-whatsapp" class="flex items-center justify-between cursor-pointer">
+                         <span class="text-gray-300">Receber via WhatsApp</span>
+                         <div class="relative">
+                             <input type="checkbox" id="toggle-whatsapp" class="sr-only toggle-checkbox" data-setting="notifyViaWhatsApp">
+                             <div class="toggle-bg bg-gray-600 border-2 border-gray-600 h-6 w-11 rounded-full"></div>
+                             <div class="toggle-dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform"></div>
+                         </div>
+                     </label>
+                     <div class="mt-2">
+                        <label for="whatsapp-number-confirm" class="block text-sm font-medium mb-1 text-gray-400">Seu Nº WhatsApp (com + DDI):</label>
+                        <input type="tel" id="whatsapp-number-confirm" placeholder="+5519999998888" class="modal-input w-full p-2 rounded text-sm" data-setting="whatsappNumber">
+                        <small class="text-xs text-gray-500 mt-1 block">Confirme seu número após conectar.</small>
+                     </div>
+                     <div id="whatsapp-connection-status" class="mt-3 text-center">
+                         <span id="whatsapp-status-text" class="text-sm text-gray-400">Status: Desconectado</span>
+                         <div id="whatsapp-qr-container" class="mt-2 hidden flex justify-center">
+                             <img id="whatsapp-qr-code" src="" alt="QR Code WhatsApp" class="w-40 h-40 border border-gray-600 rounded">
+                         </div>
+                         <button id="whatsapp-connect-btn" class="mt-3 w-full modal-button text-white text-sm font-semibold py-1.5 px-3 rounded-lg">Conectar WhatsApp</button>
+                         <button id="whatsapp-disconnect-btn" class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-1.5 px-3 rounded-lg hidden">Desconectar WhatsApp</button>
+                     </div>
+                 </div>
+                 <div class="p-2"> <button id="logout-button" class="w-full text-center p-2 rounded hover:bg-red-700/50 text-red-400 transition-colors">
                          Sair
                      </button>
                  </div>
@@ -195,5 +218,6 @@
     </svg>
 
     <script src="script.js" defer></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </body>
 </html>
