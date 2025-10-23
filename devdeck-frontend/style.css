@@ -60,7 +60,6 @@ body {
 
 /* --- ESTILOS PARA OS TOGGLES DE NOTIFICAÇÃO --- */
 .toggle-checkbox:checked + .toggle-bg {
-    /* CORRIGIDO: Substituído @apply por CSS puro */
     background-color: #16a34a; /* Equivalente a bg-green-600 */
     border-color: #16a34a; /* Equivalente a border-green-600 */
 }

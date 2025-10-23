@@ -58,7 +58,6 @@ const boardNameInput = document.getElementById('board-name');
 const boardError = document.getElementById('board-error');
 const boardModalCancelButton = document.getElementById('board-modal-cancel');
 const boardModalSaveButton = document.getElementById('board-modal-save');
-// Modais Customizados
 const alertModal = document.getElementById('alert-modal');
 const alertModalTitle = document.getElementById('alert-modal-title');
 const alertModalMessage = document.getElementById('alert-modal-message');
@@ -88,7 +87,7 @@ let currentUserEmail = localStorage.getItem(USER_EMAIL_KEY);
 let currentUserName = localStorage.getItem(USER_NAME_KEY);
 let confirmResolve = null;
 let currentUserSettings = {
-    notifyDailySummary: true,
+    notifyDailySummary: true, // Default values
     notifyStaleTasks: true
 };
 
@@ -253,7 +252,15 @@ function renderBoardSelectors(boards) {
     newBtn.addEventListener('click', () => openBoardModal()); boardsContainer.appendChild(newBtn);
 }
 function setActiveBoardUI(id) { document.querySelectorAll('.board-button').forEach(b => b.classList.toggle('active-board', parseInt(b.dataset.boardId, 10) === id)); }
-function renderTasks(tasks) { document.querySelectorAll('.tasks').forEach(c => c.innerHTML = ''); if (!tasks || !tasks.length) { setupDragAndDrop(); return; } tasks.forEach(t => { const colId = `${t.status.toLowerCase()}-tasks`; const colEl = document.getElementById(colId); if (colEl) colEl.appendChild(createTaskElement(t)); else console.warn(`Coluna ${colId} não encontrada.`); }); setupDragAndDrop(); }
+function renderTasks(tasks) {
+    document.querySelectorAll('.tasks').forEach(c => c.innerHTML = '');
+    if (!tasks || !tasks.length) {
+        setupDragAndDrop(); // Chamar mesmo se vazio
+        return;
+    }
+    tasks.forEach(t => { const colId = `${t.status.toLowerCase()}-tasks`; const colEl = document.getElementById(colId); if (colEl) colEl.appendChild(createTaskElement(t)); else console.warn(`Coluna ${colId} não encontrada.`); });
+    setupDragAndDrop(); // Chamar após renderizar
+}
 function createTaskElement(task) { const d=document.createElement('div'); d.className='task-card bg-[#2e335a] rounded-lg shadow-md p-3 mb-3 cursor-grab text-white'; d.draggable=true; d.dataset.taskId=task.id; d.dataset.status=task.status; const t=document.createElement('strong'); t.className='block font-semibold mb-1 truncate'; t.textContent=task.title; d.appendChild(t); if(task.description){const s=document.createElement('small'); s.className='block text-gray-400 text-sm break-words'; s.textContent=task.description; d.appendChild(s);} d.addEventListener('click', (e)=>{if(draggedTaskElement) return; openTaskModal(task)}); return d; }
 
 // --- Modais Tarefa ---
@@ -280,24 +287,130 @@ async function handleDeleteBoard(id, name) {
     if(confirmed){ try{ await deleteBoard(id); console.log(`Quadro ${id} excluído.`); const wasCurrent=currentBoardId===id; await loadInitialData(wasCurrent?null:currentBoardId); } catch(err){ console.error(`Falha excluir quadro ${id}:`, err); } }
 }
 
-// --- Drag and Drop ---
-function handleDragStart(e){const t=e.target.closest('.task-card'); if(!t){e.preventDefault(); return;} draggedTaskElement=t; e.dataTransfer.setData('text/plain', t.dataset.taskId); e.dataTransfer.effectAllowed='move'; setTimeout(()=>t.classList.add('dragging'),0);}
-function handleDragEnd(e){if(draggedTaskElement)draggedTaskElement.classList.remove('dragging'); draggedTaskElement=null; document.querySelectorAll('.task-placeholder').forEach(p=>p.remove());}
-function handleDragOver(e){e.preventDefault(); e.dataTransfer.dropEffect='move'; const tc=e.target.closest('.tasks'); if(!tc||!draggedTaskElement)return; const p=tc.querySelector('.task-placeholder'); if(!p){document.querySelectorAll('.task-placeholder').forEach(p=>p.remove()); const nP=document.createElement('div'); nP.className='task-placeholder'; const aE=getDragAfterElement(tc,e.clientY); if(aE==null)tc.appendChild(nP); else tc.insertBefore(nP,aE);}else{const aE=getDragAfterElement(tc,e.clientY); if(aE!==p.nextSibling){if(aE==null)tc.appendChild(p); else tc.insertBefore(p,aE);}}}
-function getDragAfterElement(c,y){const dE=[...c.querySelectorAll('.task-card:not(.dragging)')]; return dE.reduce((cl,ch)=>{const b=ch.getBoundingClientRect(); const o=y-b.top-b.height/2; if(o<0&&o>cl.offset)return{offset:o,element:ch}; else return cl;},{offset:Number.NEGATIVE_INFINITY}).element;}
-function handleDragEnter(e){e.preventDefault();}
-function handleDragLeave(e){const t=e.target.closest('.tasks'); if(t&&!t.contains(e.relatedTarget)){const p=t.querySelector('.task-placeholder'); if(p)p.remove();}}
-async function handleDrop(e){
-    e.preventDefault(); const tC=e.target.closest('.tasks'); const c=tC?.closest('.column'); const p=tC?.querySelector('.task-placeholder');
-    document.querySelectorAll('.task-placeholder').forEach(p=>p.remove()); if(draggedTaskElement)draggedTaskElement.classList.remove('dragging');
-    if(!c||!tC||!draggedTaskElement){draggedTaskElement=null; return;}
-    const tId=draggedTaskElement.dataset.taskId; const nS=c.dataset.status; const oS=draggedTaskElement.dataset.status;
-    if(p){tC.insertBefore(draggedTaskElement,p); p.remove();} else {const aE=getDragAfterElement(tC,e.clientY); if(aE==null)tC.appendChild(draggedTaskElement); else tC.insertBefore(draggedTaskElement,aE);}
-    draggedTaskElement.dataset.status=nS; const lDE=draggedTaskElement; draggedTaskElement=null;
-    if(nS!==oS){try{await updateTask(tId,{status:nS}); console.log(`Tarefa ${tId} movida para ${nS}`);}
-    catch(err){console.error('Falha D&D:', err); const oC=document.querySelector(`.column[data-status="${oS}"] .tasks`); if(oC){oC.appendChild(lDE); lDE.dataset.status=oS;} showAlert('Erro ao mover tarefa.', 'Erro de Arraste');}}
+// --- Drag and Drop (CORRIGIDO) ---
+function handleDragStart(e){
+    const t=e.target.closest('.task-card'); 
+    if(!t){e.preventDefault(); return;} 
+    draggedTaskElement=t; 
+    e.dataTransfer.setData('text/plain', t.dataset.taskId); 
+    e.dataTransfer.effectAllowed='move'; 
+    setTimeout(()=>t.classList.add('dragging'),0);
 }
-function setupDragAndDrop(){document.querySelectorAll('.task-card').forEach(t=>{t.removeEventListener('dragstart',handleDragStart); t.removeEventListener('dragend',handleDragEnd);}); document.querySelectorAll('.column .tasks').forEach(c=>{c.removeEventListener('dragover',handleDragOver); c.removeEventListener('dragenter',handleDragEnter); c.removeEventListener('dragleave',handleDragLeave); c.removeEventListener('drop',handleDrop);}); const ts=document.querySelectorAll('.task-card'); const cs=document.querySelectorAll('.column .tasks'); ts.forEach(t=>{t.addEventListener('dragstart',handleDragStart); t.addEventListener('dragend',handleDragEnd);}); cs.forEach(c=>{c.addEventListener('dragover',handleDragOver); c.addEventListener('dragenter',handleDragEnter); c.addEventListener('dragleave',handleDragLeave); c.addEventListener('drop',handleDrop);});}
+function handleDragEnd(e){
+    if(draggedTaskElement)draggedTaskElement.classList.remove('dragging'); 
+    draggedTaskElement=null; 
+    document.querySelectorAll('.task-placeholder').forEach(p=>p.remove());
+}
+function handleDragOver(e){
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect='move'; 
+    const tc=e.target.closest('.tasks'); 
+    if(!tc||!draggedTaskElement)return; 
+    const p=tc.querySelector('.task-placeholder'); 
+    if(!p){
+        document.querySelectorAll('.task-placeholder').forEach(p=>p.remove()); 
+        const nP=document.createElement('div'); 
+        nP.className='task-placeholder'; 
+        const aE=getDragAfterElement(tc,e.clientY); 
+        if(aE==null)tc.appendChild(nP); 
+        else tc.insertBefore(nP,aE);
+    }else{
+        const aE=getDragAfterElement(tc,e.clientY); 
+        if(aE!==p.nextSibling){
+            if(aE==null)tc.appendChild(p); 
+            else tc.insertBefore(p,aE);
+        }
+    }
+}
+function getDragAfterElement(c,y){
+    const dE=[...c.querySelectorAll('.task-card:not(.dragging)')]; 
+    return dE.reduce((cl,ch)=>{
+        const b=ch.getBoundingClientRect(); 
+        const o=y-b.top-b.height/2; 
+        if(o<0&&o>cl.offset)return{offset:o,element:ch}; 
+        else return cl;
+    },{offset:Number.NEGATIVE_INFINITY}).element;
+}
+function handleDragEnter(e){
+    e.preventDefault();
+}
+function handleDragLeave(e){
+    const t=e.target.closest('.tasks'); 
+    if(t&&!t.contains(e.relatedTarget)){
+        const p=t.querySelector('.task-placeholder'); 
+        if(p)p.remove();
+    }
+}
+async function handleDrop(e) {
+    e.preventDefault();
+    const tasksContainer = e.target.closest('.tasks');
+    const column = tasksContainer?.closest('.column');
+    
+    // 1. Encontra o placeholder na coluna atual
+    const placeholder = tasksContainer?.querySelector('.task-placeholder');
+
+    // 2. Remove o estilo de arrastar
+    if (draggedTaskElement) draggedTaskElement.classList.remove('dragging');
+
+    // 3. Verifica se o drop é válido
+    if (!column || !tasksContainer || !draggedTaskElement) {
+        draggedTaskElement = null;
+        document.querySelectorAll('.task-placeholder').forEach(p => p.remove()); // Limpa todos os placeholders
+        return;
+    }
+
+    const taskId = draggedTaskElement.dataset.taskId;
+    const newStatus = column.dataset.status;
+    const oldStatus = draggedTaskElement.dataset.status;
+
+    // 4. Insere o elemento arrastado
+    if (placeholder) {
+        // Substitui o placeholder pelo elemento arrastado
+        placeholder.replaceWith(draggedTaskElement);
+    } else {
+        // Fallback: se não houver placeholder, tenta adicionar no final ou na posição do cursor
+        const afterElement = getDragAfterElement(tasksContainer, e.clientY);
+        if (afterElement == null) {
+            tasksContainer.appendChild(draggedTaskElement);
+        } else {
+            tasksContainer.insertBefore(draggedTaskElement, afterElement);
+        }
+    }
+    
+    // 5. Limpa qualquer outro placeholder (de outras colunas)
+    document.querySelectorAll('.task-placeholder').forEach(p => p.remove());
+
+    // 6. Atualiza estado e API
+    draggedTaskElement.dataset.status = newStatus;
+    const locallyDraggedElement = draggedTaskElement;
+    draggedTaskElement = null;
+
+    if (newStatus !== oldStatus) {
+        try {
+            await updateTask(taskId, { status: newStatus });
+            console.log(`Tarefa ${taskId} movida para ${newStatus}`);
+        }
+        catch (err) {
+            console.error('Falha D&D:', err);
+            // Reverte a mudança visual
+            const originalColumnTasks = document.querySelector(`.column[data-status="${oldStatus}"] .tasks`);
+            if (originalColumnTasks) {
+                originalColumnTasks.appendChild(locallyDraggedElement); // Adiciona de volta
+                locallyDraggedElement.dataset.status = oldStatus;
+            }
+            showAlert('Erro ao mover tarefa.', 'Erro de Arraste');
+        }
+    }
+}
+function setupDragAndDrop(){
+    document.querySelectorAll('.task-card').forEach(t=>{t.removeEventListener('dragstart',handleDragStart); t.removeEventListener('dragend',handleDragEnd);}); 
+    document.querySelectorAll('.column .tasks').forEach(c=>{c.removeEventListener('dragover',handleDragOver); c.removeEventListener('dragenter',handleDragEnter); c.removeEventListener('dragleave',handleDragLeave); c.removeEventListener('drop',handleDrop);}); 
+    const ts=document.querySelectorAll('.task-card'); 
+    const cs=document.querySelectorAll('.column .tasks'); 
+    ts.forEach(t=>{t.addEventListener('dragstart',handleDragStart); t.addEventListener('dragend',handleDragEnd);}); 
+    cs.forEach(c=>{c.addEventListener('dragover',handleDragOver); c.addEventListener('dragenter',handleDragEnter); c.addEventListener('dragleave',handleDragLeave); c.addEventListener('drop',handleDrop);});
+}
+// --- FIM DO DRAG AND DROP ---
 
 // --- Inicialização Kanban e Seleção ---
 async function loadTasksForBoard(id) { if(!id){renderTasks([]); return;} try{const ts=await getTasks(id); renderTasks(ts);}catch(err){console.error(`Erro carregar tasks ${id}:`, err); renderTasks([]);}}
