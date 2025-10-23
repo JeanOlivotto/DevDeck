@@ -1,37 +1,38 @@
-/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+// devdeck-backend/src/whatsapp/whatsapp.gateway.ts
 import {
   WebSocketGateway,
   SubscribeMessage,
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, Inject, forwardRef } from '@nestjs/common'; // Import Inject and forwardRef
 import { JwtService } from '@nestjs/jwt'; // Para autenticar a conexão WS
-import { WhatsappService } from './whatsapp.service';
-// Você precisará de um AuthGuard para WebSockets ou validar o token manualmente
+import { WhatsappService } from './whatsapp.service'; // Keep regular import
 
 // Simples validação de token (adapte conforme necessário ou use um Guard real)
 async function validateToken(
   client: Socket,
   jwtService: JwtService,
 ): Promise<number | null> {
-  const token: string | undefined = client.handshake.auth?.token as string | undefined;
+  // ATENÇÃO: Use a mesma chave secreta definida no seu AuthModule/ConfigModule
+  const jwtSecret =
+    process.env.JWT_SECRET ||
+    'sk_jwt_7x9A2qB8vR3tY6wE1zC5nM8pQ0sK3jH7gF4dL9oV2cX6rT1yU5iW8aB0eN3mZ7qP'; // Fallback apenas para exemplo, use ConfigService
+  const token = client.handshake.auth?.token;
   if (!token) return null;
   try {
-    const payload = await jwtService.verifyAsync(token, {
-      secret: process.env.JWT_SECRET /* Use sua chave JWT */,
-    });
+    // Verifique se o secret aqui CORRESPONDE ao usado para assinar o token no login
+    const payload = await jwtService.verifyAsync(token, { secret: jwtSecret });
     return payload.sub; // Assumindo que 'sub' é o userId
   } catch (e) {
+    console.error('Erro ao validar token WebSocket:', e.message); // Log do erro
     return null;
   }
 }
@@ -50,6 +51,8 @@ export class WhatsappGateway
   private connectedUsers = new Map<number, string>(); // userId -> socketId
 
   constructor(
+    // Use Inject and forwardRef aqui
+    @Inject(forwardRef(() => WhatsappService))
     private whatsappService: WhatsappService,
     private jwtService: JwtService,
   ) {}
@@ -80,6 +83,7 @@ export class WhatsappGateway
     for (const [userId, socketId] of this.connectedUsers.entries()) {
       if (socketId === client.id) {
         this.connectedUsers.delete(userId);
+        this.logger.log(`Usuário ${userId} removido do mapa de conexões WS.`);
         break;
       }
     }
@@ -111,7 +115,7 @@ export class WhatsappGateway
       `Solicitação de desconexão WhatsApp recebida para usuário ${userId}`,
     );
     try {
-      this.whatsappService.disconnectUser(userId);
+      await this.whatsappService.disconnectUser(userId);
       return { success: true, message: 'Desconectando...' };
     } catch (error) {
       this.logger.error(`Erro ao desconectar usuário ${userId}:`, error);
