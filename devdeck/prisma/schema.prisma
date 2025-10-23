@@ -1,0 +1,55 @@
+// schema.prisma
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- NOVO MODELO USER ---
+model User {
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  name              String
+  password          String
+  boards            Board[]
+  whatsappNumber    String? 
+  notifyViaWhatsApp Boolean  @default(false)
+  whatsappSession   String? 
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  notifyDailySummary Boolean @default(true)
+  notifyStaleTasks   Boolean @default(true)
+
+  @@map("users")
+}
+
+model Board {
+  id     Int    @id @default(autoincrement())
+  name   String // Nome não precisa mais ser globalmente único, apenas por usuário
+  tasks  Task[]
+  // --- ADICIONAR RELAÇÃO COM USER ---
+  userId Int // Chave estrangeira
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade) // Deletar quadros se o user for deletado
+
+  // Adiciona índice único para nome E userId, permitindo nomes iguais para usuários diferentes
+  @@unique([name, userId])
+  @@map("boards")
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      String   @default("TODO") // TODO, DOING, DONE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  boardId     Int
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}

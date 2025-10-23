@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-[#0f1225] via-[#1a1d3a] to-[#0f1225] text-gray-100 font-inter;
+  }
+}
+
+@layer components {
+  .kanban-board {
+    @apply flex gap-6 overflow-x-auto pb-4;
+  }
+
+  .kanban-column {
+    @apply flex-shrink-0 bg-[#1e2139] rounded-xl p-4 shadow-lg;
+    min-width: 320px;
+    max-width: 350px;
+  }
+
+  .kanban-column-header {
+    @apply flex items-center justify-between mb-4 pb-3 border-b border-gray-700;
+  }
+
+  .kanban-column-title {
+    @apply text-lg font-semibold flex items-center gap-2;
+  }
+
+  .task-card {
+    @apply bg-[#23284a] rounded-lg p-4 mb-3 shadow-md border border-transparent hover:border-purple-500 transition-all cursor-move;
+  }
+
+  .task-card-dragging {
+    @apply opacity-50;
+  }
+
+  .task-card-over {
+    @apply border-cyan-400;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-all duration-200 hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-all duration-200;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full bg-[#23284a] text-white border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4;
+  }
+
+  .modal-content {
+    @apply bg-[#1e2139] rounded-xl shadow-2xl max-w-md w-full p-6;
+  }
+
+  .toggle-bg {
+    @apply transition-colors duration-200;
+  }
+
+  .toggle-checkbox:checked ~ .toggle-bg {
+    @apply bg-purple-600;
+  }
+
+  .toggle-checkbox:checked ~ .toggle-bg .toggle-dot {
+    @apply transform translate-x-5;
+  }
+
+  .toggle-dot {
+    @apply transition-transform duration-200;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1d3a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #7c3aed;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6d28d9;
+}
