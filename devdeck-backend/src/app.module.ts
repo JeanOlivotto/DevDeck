@@ -14,6 +14,9 @@ import { NotificationModule } from './notification/notification.module';
 import { NotificationService } from './notification/notification.service';
 import { ConfigModule } from '@nestjs/config';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { EncryptionModule } from './encryption/encryption.module';
+import { EncryptionService } from './encryption/encryption.service';
+import { WhatsappService } from './whatsapp/whatsapp.service';
 
 @Module({
   imports: [
@@ -29,8 +32,16 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     EmailModule,
     NotificationModule,
     WhatsappModule,
+    EncryptionModule,
   ],
   controllers: [AuthController, UserController],
-  providers: [UserService, AuthService, EmailService, NotificationService],
+  providers: [
+    UserService,
+    AuthService,
+    EmailService,
+    NotificationService,
+    EncryptionService,
+    WhatsappService,
+  ],
 })
 export class AppModule {}

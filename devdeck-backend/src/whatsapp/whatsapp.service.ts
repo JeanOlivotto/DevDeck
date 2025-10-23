@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-implied-eval */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -29,7 +30,7 @@ import { EncryptionService } from '../encryption/encryption.service';
 import * as qrcode from 'qrcode';
 import { Boom } from '@hapi/boom';
 import { WhatsappGateway } from './whatsapp.gateway';
-import { setTimeout } from 'timers/promises';
+// import { setTimeout } from 'timers/promises';
 
 interface BaileysAuthState {
   creds: AuthenticationCreds;
@@ -128,29 +129,37 @@ export class WhatsappService implements OnModuleDestroy {
   }
 
   private getInitialAuthState(): BaileysAuthState {
+    const noiseKey = {
+      public: Uint8Array.from(Buffer.alloc(32)),
+      private: Uint8Array.from(Buffer.alloc(32)),
+    };
+
     return {
       creds: {
-        noiseKey: { public: new Uint8Array(), private: new Uint8Array() },
+        noiseKey,
         signedIdentityKey: {
-          public: new Uint8Array(),
-          private: new Uint8Array(),
+          public: Uint8Array.from(Buffer.alloc(32)),
+          private: Uint8Array.from(Buffer.alloc(32)),
         },
         signedPreKey: {
-          keyId: 0,
-          keyPair: { public: new Uint8Array(), private: new Uint8Array() },
-          signature: new Uint8Array(),
+          keyId: 1,
+          keyPair: {
+            public: Uint8Array.from(Buffer.alloc(32)),
+            private: Uint8Array.from(Buffer.alloc(32)),
+          },
+          signature: Uint8Array.from(Buffer.alloc(64)),
         },
-        registrationId: 0,
-        advSecretKey: '',
-        nextPreKeyId: 0,
-        firstUnuploadedPreKeyId: 0,
+        registrationId: Math.floor(Math.random() * (2 ** 31 - 1)), // ID aleatório
+        advSecretKey: Uint8Array.from(Buffer.alloc(32)),
+        nextPreKeyId: 1,
+        firstUnuploadedPreKeyId: 1,
         account: undefined,
         me: undefined,
         signalIdentities: [],
         lastAccountSyncTimestamp: 0,
         pairingEphemeralKeyPair: {
-          public: new Uint8Array(),
-          private: new Uint8Array(),
+          public: Uint8Array.from(Buffer.alloc(32)),
+          private: Uint8Array.from(Buffer.alloc(32)),
         },
         processedHistoryMessages: [],
         accountSyncCounter: 0,
@@ -302,7 +311,15 @@ export class WhatsappService implements OnModuleDestroy {
           set: (data: { [keyType: string]: { [id: string]: any } }) => {
             for (const keyType in data) {
               if (!state.keys[keyType]) state.keys[keyType] = {};
-              Object.assign(state.keys[keyType], data[keyType]);
+              // Converte Uint8Array para Buffer se necessário
+              Object.keys(data[keyType]).forEach((id) => {
+                const value = data[keyType][id];
+                if (value instanceof Uint8Array && !(value instanceof Buffer)) {
+                  state.keys[keyType][id] = Buffer.from(value);
+                } else {
+                  state.keys[keyType][id] = value;
+                }
+              });
             }
           },
         },
@@ -319,6 +336,50 @@ export class WhatsappService implements OnModuleDestroy {
       },
       loadState: async () => {
         state = await this.loadAuthState(userId);
+        // Converte Uint8Array para Buffer após carregar
+        if (state && state.creds) {
+          const creds = state.creds as any;
+          if (
+            creds.noiseKey?.private instanceof Uint8Array &&
+            !(creds.noiseKey.private instanceof Buffer)
+          ) {
+            creds.noiseKey.public = Buffer.from(creds.noiseKey.public);
+            creds.noiseKey.private = Buffer.from(creds.noiseKey.private);
+          }
+          if (creds.signedIdentityKey?.private instanceof Uint8Array) {
+            creds.signedIdentityKey.public = Buffer.from(
+              creds.signedIdentityKey.public,
+            );
+            creds.signedIdentityKey.private = Buffer.from(
+              creds.signedIdentityKey.private,
+            );
+          }
+          if (creds.signedPreKey?.keyPair?.private instanceof Uint8Array) {
+            creds.signedPreKey.keyPair.public = Buffer.from(
+              creds.signedPreKey.keyPair.public,
+            );
+            creds.signedPreKey.keyPair.private = Buffer.from(
+              creds.signedPreKey.keyPair.private,
+            );
+            creds.signedPreKey.signature = Buffer.from(
+              creds.signedPreKey.signature,
+            );
+          }
+          if (
+            creds.advSecretKey instanceof Uint8Array &&
+            !(creds.advSecretKey instanceof Buffer)
+          ) {
+            creds.advSecretKey = Buffer.from(creds.advSecretKey);
+          }
+          if (creds.pairingEphemeralKeyPair?.private instanceof Uint8Array) {
+            creds.pairingEphemeralKeyPair.public = Buffer.from(
+              creds.pairingEphemeralKeyPair.public,
+            );
+            creds.pairingEphemeralKeyPair.private = Buffer.from(
+              creds.pairingEphemeralKeyPair.private,
+            );
+          }
+        }
         auth.state.creds = state.creds;
         return state;
       },
@@ -331,63 +392,55 @@ export class WhatsappService implements OnModuleDestroy {
     const existingSock = this.activeSockets.get(userId);
 
     if (existingSock?.user) {
-      this.logger.log(`Reutilizando socket ativo para usuário ${userId}`);
+      this.logger.log(`Socket ativo reutilizado para usuário ${userId}`);
       this.whatsappGateway.sendStatusUpdate(userId, 'open');
       return;
     }
 
     if (existingSock) {
-      this.logger.warn(
-        `Socket existente para usuário ${userId} não está ativo, recriando.`,
-      );
       try {
-        existingSock.end(undefined);
+        existingSock.end(new Error('Recriando socket'));
       } catch (e) {
-        this.logger.debug(
-          `Erro ao fechar socket anterior: ${(e as Error).message}`,
-        );
+        this.logger.debug(`Erro ao fechar socket anterior`);
       }
       this.activeSockets.delete(userId);
+      this.authStateCache.delete(userId);
     }
 
-    this.logger.log(`Inicializando socket para usuário ${userId}`);
+    this.logger.log(`Inicializando novo socket para usuário ${userId}`);
     this.whatsappGateway.sendStatusUpdate(userId, 'connecting');
 
     const authStore = this.createPrismaAuthStore(userId);
     const { state, saveCreds, clearState } = authStore;
 
     try {
-      let version: [number, number, number] = [2, 2340, 15];
-      let isLatest = false;
+      // Carregar estado existente antes de criar o socket
+      await authStore.loadState();
+
+      let version: [number, number, number] = [2, 2345, 104];
 
       try {
         const versionData = (await Promise.race([
           fetchLatestBaileysVersion(),
-          setTimeout(10000, () => {
-            throw new Error('Timeout ao buscar versão do Baileys');
-          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 5000),
+          ),
         ])) as { version: number[]; isLatest: boolean };
 
-        // Ensure version is always a tuple of 3 numbers
         if (
           Array.isArray(versionData.version) &&
-          versionData.version.length === 3
+          versionData.version.length >= 3
         ) {
-          version = [
-            versionData.version[0],
-            versionData.version[1],
-            versionData.version[2],
-          ];
+          version = versionData.version.slice(0, 3) as [number, number, number];
         }
-        isLatest = versionData.isLatest;
       } catch (err) {
         this.logger.warn(
-          `Erro ao buscar versão do Baileys, usando padrão. Erro: ${(err as Error).message}`,
+          `Usando versão padrão do Baileys: ${version.join('.')}`,
         );
       }
 
       this.logger.log(
-        `[User ${userId}] Usando Baileys v${version.join('.')}, isLatest: ${isLatest}`,
+        `[User ${userId}] Criando socket com Baileys v${version.join('.')}`,
       );
 
       const sock = makeWASocket({
@@ -414,37 +467,40 @@ export class WhatsappService implements OnModuleDestroy {
             const qrDataURL = await qrcode.toDataURL(qr);
             this.whatsappGateway.sendQrToUser(userId, qrDataURL);
           } catch (err) {
-            this.logger.error(
-              `Erro ao gerar QR Data URL para ${userId}`,
-              (err as Error).stack,
-            );
+            this.logger.error(`Erro ao gerar QR Code`, (err as Error).stack);
           }
         }
 
         if (connection === 'close') {
           const statusCode = (lastDisconnect?.error as Boom)?.output
             ?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+          const shouldReconnect =
+            statusCode !== DisconnectReason.loggedOut &&
+            statusCode !== DisconnectReason.connectionClosed;
 
           this.logger.error(
-            `Conexão fechada para ${userId} | Razão: ${DisconnectReason[statusCode] || 'Desconhecida'} (${statusCode}), Reconectar: ${shouldReconnect}`,
+            `Conexão fechada para ${userId} | Código: ${statusCode}, Reconectar: ${shouldReconnect}`,
           );
 
           this.activeSockets.delete(userId);
-          this.authStateCache.delete(userId);
 
           if (!shouldReconnect) {
-            this.logger.warn(
-              `Deslogado permanentemente: Usuário ${userId}. Limpando credenciais.`,
-            );
+            this.logger.warn(`Logout permanente para usuário ${userId}`);
             await clearState();
             this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
           } else {
+            this.logger.log(`Tentando reconectar usuário ${userId}...`);
             this.whatsappGateway.sendStatusUpdate(userId, 'close');
+            // Aguardar antes de reconectar
+            setTimeout(() => {
+              this.initializeSocketForUser(userId).catch((e) =>
+                this.logger.error(`Erro ao reconectar ${userId}`, e),
+              );
+            }, 3000);
           }
         } else if (connection === 'open') {
           this.logger.log(
-            `Conexão WhatsApp aberta para usuário ${userId}, ID: ${sock.user?.id}`,
+            `WhatsApp conectado para usuário ${userId}: ${sock.user?.id}`,
           );
           this.whatsappGateway.sendStatusUpdate(userId, 'open');
         }
@@ -453,9 +509,10 @@ export class WhatsappService implements OnModuleDestroy {
       sock.ev.on('creds.update', saveCreds);
     } catch (error) {
       this.logger.error(
-        `Erro ao inicializar socket para usuário ${userId}: ${(error as Error).message}`,
+        `Erro ao inicializar socket para ${userId}`,
         (error as Error).stack,
       );
+      this.activeSockets.delete(userId);
       this.whatsappGateway.sendStatusUpdate(userId, 'error');
       throw error;
     }
