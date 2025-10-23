@@ -1,3 +1,4 @@
+import { addCorsHeaders, handleCorsPreFlight } from '@/lib/cors'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, unauthorizedResponse } from '@/lib/api-auth'
@@ -18,6 +19,10 @@ const updateTaskSchema = z.object({
 })
 
 // GET /api/tasks - List all tasks for authenticated user
+export async function OPTIONS() {
+  return handleCorsPreFlight()
+}
+
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request)
   if (!user) return unauthorizedResponse()

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:3000/app/api';
 const TOKEN_KEY = 'devdeck_auth_token';
 const USER_EMAIL_KEY = 'devdeck_user_email';
 const USER_NAME_KEY = 'devdeck_user_name';

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser, unauthorizedResponse } from '@/lib/api-auth'
+import { addCorsHeaders, handleCorsPreFlight } from '@/lib/cors'
 import { z } from 'zod'
 
 const updateBoardSchema = z.object({
@@ -11,10 +12,15 @@ type Params = {
   params: Promise<{ id: string }>
 }
 
+// Handle CORS preflight
+export async function OPTIONS() {
+  return handleCorsPreFlight()
+}
+
 // GET /api/boards/[id] - Get a single board
 export async function GET(request: NextRequest, { params }: Params) {
   const user = await getAuthUser(request)
-  if (!user) return unauthorizedResponse()
+  if (!user) return addCorsHeaders(unauthorizedResponse())
 
   const { id } = await params
   const boardId = parseInt(id)
