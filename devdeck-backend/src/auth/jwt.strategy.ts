@@ -14,28 +14,19 @@ const JWT_SECRET =
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly userService: UserService) {
-    // Injetar UserService
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), // Extrai o token do cabeçalho 'Authorization: Bearer <token>'
-      ignoreExpiration: false, // Garante que tokens expirados sejam rejeitados
-      secretOrKey: JWT_SECRET, // Usa a mesma chave secreta para verificar a assinatura
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: JWT_SECRET,
     });
   }
 
-  // Esta função é chamada automaticamente pelo Passport após verificar a assinatura do token
-  // O payload é o objeto que definimos ao criar o token no AuthService (login)
   async validate(payload: any) {
-    // payload = { email: user.email, sub: user.id }
-
-    // Opcional: Você pode adicionar lógica extra aqui, como verificar se o usuário
-    // ainda existe no banco de dados usando o payload.sub (userId).
     const user = await this.userService.findOneById(payload.sub);
     if (!user) {
       throw new UnauthorizedException('Usuário não encontrado.');
     }
 
-    // O objeto retornado aqui será injetado no objeto `request.user`
-    // dos controllers protegidos pelo JwtAuthGuard.
-    return { userId: payload.sub, email: payload.email };
+    return { userId: payload.sub, email: payload.email, name: payload.name };
   }
 }
