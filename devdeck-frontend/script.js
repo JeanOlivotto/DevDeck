@@ -58,6 +58,7 @@ const boardNameInput = document.getElementById('board-name');
 const boardError = document.getElementById('board-error');
 const boardModalCancelButton = document.getElementById('board-modal-cancel');
 const boardModalSaveButton = document.getElementById('board-modal-save');
+// Modais Customizados
 const alertModal = document.getElementById('alert-modal');
 const alertModalTitle = document.getElementById('alert-modal-title');
 const alertModalMessage = document.getElementById('alert-modal-message');
@@ -67,6 +68,16 @@ const confirmModalTitle = document.getElementById('confirm-modal-title');
 const confirmModalMessage = document.getElementById('confirm-modal-message');
 const confirmModalCancel = document.getElementById('confirm-modal-cancel');
 const confirmModalConfirm = document.getElementById('confirm-modal-confirm');
+const toggleDailySummary = document.getElementById('toggle-daily-summary');
+const toggleStaleTasks = document.getElementById('toggle-stale-tasks');
+const allToggles = document.querySelectorAll('.toggle-checkbox');
+// Info Modal
+const infoModal = document.getElementById('info-modal');
+const infoModalTitle = document.getElementById('info-modal-title');
+const infoModalDescription = document.getElementById('info-modal-description');
+const infoModalEmail = document.getElementById('info-modal-email');
+const infoModalClose = document.getElementById('info-modal-close');
+const infoIcons = document.querySelectorAll('.info-icon');
 
 // --- Variáveis de Estado ---
 let currentBoardId = null;
@@ -76,8 +87,12 @@ let authToken = localStorage.getItem(TOKEN_KEY);
 let currentUserEmail = localStorage.getItem(USER_EMAIL_KEY);
 let currentUserName = localStorage.getItem(USER_NAME_KEY);
 let confirmResolve = null;
+let currentUserSettings = {
+    notifyDailySummary: true,
+    notifyStaleTasks: true
+};
 
-// --- Funções de Alerta Customizadas ---
+// --- Funções de Alerta / Confirmação / Info Modais ---
 function showAlert(message, title = 'Aviso') {
     alertModalTitle.textContent = title;
     alertModalMessage.textContent = message;
@@ -102,6 +117,16 @@ function closeConfirmModal(result) {
         confirmResolve(result);
         confirmResolve = null;
     }
+}
+function openInfoModal(title, description, email) {
+    infoModalTitle.textContent = title;
+    infoModalDescription.textContent = description;
+    infoModalEmail.textContent = email || 'Nenhum e-mail cadastrado';
+    infoModal.classList.remove('hidden');
+    infoModalClose.focus();
+}
+function closeInfoModal() {
+    infoModal.classList.add('hidden');
 }
 
 // --- Funções da API ---
@@ -138,13 +163,18 @@ async function login(email, password) {
         if (data?.access_token) {
             authToken = data.access_token; localStorage.setItem(TOKEN_KEY, authToken);
             if (data.user) {
-                currentUserEmail = data.user.email; currentUserName = data.user.name;
+                currentUserEmail = data.user.email;
+                currentUserName = data.user.name;
+                currentUserSettings = {
+                    notifyDailySummary: data.user.notifyDailySummary,
+                    notifyStaleTasks: data.user.notifyStaleTasks
+                };
                 localStorage.setItem(USER_EMAIL_KEY, currentUserEmail);
                 localStorage.setItem(USER_NAME_KEY, currentUserName);
-            } else { currentUserEmail = null; currentUserName = null; localStorage.removeItem(USER_EMAIL_KEY); localStorage.removeItem(USER_NAME_KEY); }
-        } else { currentUserEmail = null; currentUserName = null; localStorage.removeItem(USER_EMAIL_KEY); localStorage.removeItem(USER_NAME_KEY); }
+            } else { currentUserEmail = null; currentUserName = null; localStorage.removeItem(USER_EMAIL_KEY); localStorage.removeItem(USER_NAME_KEY); currentUserSettings = { notifyDailySummary: true, notifyStaleTasks: true };}
+        } else { currentUserEmail = null; currentUserName = null; localStorage.removeItem(USER_EMAIL_KEY); localStorage.removeItem(USER_NAME_KEY); currentUserSettings = { notifyDailySummary: true, notifyStaleTasks: true };}
         return data;
-    } catch (error) { currentUserEmail = null; currentUserName = null; localStorage.removeItem(USER_EMAIL_KEY); localStorage.removeItem(USER_NAME_KEY); throw error; }
+    } catch (error) { currentUserEmail = null; currentUserName = null; localStorage.removeItem(USER_EMAIL_KEY); localStorage.removeItem(USER_NAME_KEY); currentUserSettings = { notifyDailySummary: true, notifyStaleTasks: true }; throw error; }
 }
 function logout() {
     authToken = null; currentUserEmail = null; currentUserName = null;
@@ -157,6 +187,18 @@ function logout() {
     userMenu.classList.add('hidden');
     userMenuDropdown.classList.remove('dropdown-visible');
     dropdownArrow.classList.remove('arrow-rotated');
+    currentUserSettings = { notifyDailySummary: true, notifyStaleTasks: true };
+}
+async function updateUserSettings(settingsData) {
+    try {
+        const updatedUser = await fetchApi('/user/settings', { method: 'PATCH', body: JSON.stringify(settingsData) });
+        currentUserSettings.notifyDailySummary = updatedUser.notifyDailySummary;
+        currentUserSettings.notifyStaleTasks = updatedUser.notifyStaleTasks;
+        console.log('Configurações atualizadas:', updatedUser);
+    } catch (error) {
+        console.error('Falha ao salvar configurações:', error);
+        updateToggleUI(); // Reverte UI se falhar
+    }
 }
 async function getBoards() { return await fetchApi('/boards'); }
 async function createBoard(name) { boardError.classList.add('hidden'); try { return await fetchApi('/boards', { method: 'POST', body: JSON.stringify({ name }) }); } catch (error) { if (error.message?.includes('já existe')) { boardError.textContent = `Quadro "${name}" já existe.`; boardError.classList.remove('hidden'); } else { showAlert(error.message, 'Erro ao Criar Quadro'); } throw error; } }
@@ -168,23 +210,9 @@ async function updateBoard(boardId, boardData) { boardError.classList.add('hidde
 async function deleteBoard(boardId) { return await fetchApi(`/boards/${boardId}`, { method: 'DELETE' }); }
 
 // --- Funções Auxiliares ---
-function getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length > 1 && parts[parts.length - 1]) {
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-}
-function generateAvatarColor(seed) {
-    let hash = 0;
-    if (!seed || seed.length === 0) return '#4a517e';
-    for (let i = 0; i < seed.length; i++) {
-        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6'];
-    return colors[Math.abs(hash) % colors.length];
-}
+function getInitials(name) { if (!name) return '?'; const parts = name.trim().split(' '); if (parts.length > 1 && parts[parts.length - 1]) { return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase(); } return name.substring(0, 2).toUpperCase(); }
+function generateAvatarColor(seed) { let hash = 0; if (!seed || seed.length === 0) return '#4a517e'; for (let i = 0; i < seed.length; i++) { hash = seed.charCodeAt(i) + ((hash << 5) - hash); } const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6']; return colors[Math.abs(hash) % colors.length]; }
+function updateToggleUI() { toggleDailySummary.checked = !!currentUserSettings.notifyDailySummary; toggleStaleTasks.checked = !!currentUserSettings.notifyStaleTasks; }
 
 // --- Controle de Views ---
 function showLoginView() { appContainer.classList.add('hidden'); authSection.classList.remove('hidden'); loginView.classList.remove('hidden'); signupView.classList.add('hidden'); userMenu.classList.add('hidden'); loginError.classList.add('hidden'); signupError.classList.add('hidden'); }
@@ -202,6 +230,7 @@ function showKanbanView() {
     userAvatar.style.backgroundColor = color;
     userDropdownName.textContent = name;
     userDropdownEmail.textContent = email;
+    updateToggleUI();
     loadInitialData();
 }
 
@@ -341,6 +370,34 @@ signupForm.addEventListener('submit', async (e) => {
 alertModalOk.addEventListener('click', closeAlertModal);
 confirmModalCancel.addEventListener('click', () => closeConfirmModal(false));
 confirmModalConfirm.addEventListener('click', () => closeConfirmModal(true));
+infoModalClose.addEventListener('click', closeInfoModal);
+infoIcons.forEach(icon => {
+    icon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault(); // Impede que o label ative o checkbox
+        const settingKey = e.target.closest('.info-icon').dataset.settingKey;
+        let title = 'Informação da Notificação';
+        let description = 'Detalhes não encontrados.';
+        if (settingKey === 'dailySummary') {
+            title = 'Resumo Diário';
+            description = 'Envia um e-mail todas as manhãs com um resumo de todas as suas tarefas que não estão marcadas como "Done".';
+        } else if (settingKey === 'staleTasks') {
+            title = 'Aviso de Tarefa Parada';
+            description = 'Envia um e-mail quando uma tarefa permanece na coluna "Doing" por mais de 2 dias sem ser atualizada ou movida.';
+        }
+        openInfoModal(title, description, currentUserEmail);
+    });
+});
+
+// Toggles de Configuração
+allToggles.forEach(toggle => {
+    toggle.addEventListener('change', (e) => {
+        const settingKey = e.target.dataset.setting;
+        const value = e.target.checked;
+        currentUserSettings[settingKey] = value;
+        updateUserSettings({ [settingKey]: value });
+    });
+});
 
 // Kanban
 document.body.addEventListener('click', function(event) {
@@ -360,8 +417,24 @@ document.addEventListener('DOMContentLoaded', () => {
     authToken = localStorage.getItem(TOKEN_KEY);
     currentUserEmail = localStorage.getItem(USER_EMAIL_KEY);
     currentUserName = localStorage.getItem(USER_NAME_KEY);
+    
     if (authToken) {
-        showKanbanView();
+        fetchApi('/user/me')
+            .then(user => {
+                currentUserEmail = user.email;
+                currentUserName = user.name;
+                currentUserSettings = {
+                    notifyDailySummary: user.notifyDailySummary,
+                    notifyStaleTasks: user.notifyStaleTasks
+                };
+                localStorage.setItem(USER_EMAIL_KEY, currentUserEmail);
+                localStorage.setItem(USER_NAME_KEY, currentUserName);
+                showKanbanView();
+            })
+            .catch(err => {
+                console.error("Erro ao buscar /user/me:", err);
+                if (!authToken) showLoginView();
+            });
     } else {
         showLoginView();
     }

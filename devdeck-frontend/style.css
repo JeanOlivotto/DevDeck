@@ -42,7 +42,7 @@ body {
 #add-board-button { margin-left: auto; flex-shrink: 0; }
 .board-selector-container::-webkit-scrollbar { height: 8px; } .board-selector-container::-webkit-scrollbar-track { background: #1e223b; border-radius: 4px;} .board-selector-container::-webkit-scrollbar-thumb { background: #3a416f; border-radius: 4px;} .board-selector-container::-webkit-scrollbar-thumb:hover { background: #4a517e; }
 
-/* --- (Ponto 1 e 3) ESTILOS PARA MENU DE USUÁRIO --- */
+/* --- ESTILOS PARA MENU DE USUÁRIO --- */
 #user-menu-dropdown {
     transition: opacity 0.2s ease-out, transform 0.2s ease-out;
     opacity: 0;
@@ -56,4 +56,25 @@ body {
 }
 #dropdown-arrow.arrow-rotated {
     transform: rotate(180deg);
+}
+
+/* --- ESTILOS PARA OS TOGGLES DE NOTIFICAÇÃO --- */
+.toggle-checkbox:checked + .toggle-bg {
+    /* CORRIGIDO: Substituído @apply por CSS puro */
+    background-color: #16a34a; /* Equivalente a bg-green-600 */
+    border-color: #16a34a; /* Equivalente a border-green-600 */
+}
+.toggle-checkbox:checked + .toggle-bg + .toggle-dot {
+    transform: translateX(100%);
+    background-color: #ffffff; /* Equivalente a bg-white */
+}
+.toggle-dot {
+    transition: transform 0.2s ease-in-out;
+}
+
+/* --- ESTILO PARA ÍCONE DE INFO --- */
+.info-icon {
+    display: inline-block;
+    vertical-align: middle;
+    cursor: help;
 }

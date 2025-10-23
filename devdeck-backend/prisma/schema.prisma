@@ -14,10 +14,13 @@ model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
-  password  String // Armazenará o hash da senha
-  boards    Board[] // Relação com os quadros do usuário
+  password  String
+  boards    Board[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  notifyDailySummary Boolean @default(true)
+  notifyStaleTasks   Boolean @default(true)
 
   @@map("users")
 }

@@ -1,14 +1,15 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, User } from '@prisma/client'; // Importe User se precisar do tipo
+import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
   constructor(private prisma: PrismaService) {}
 
   // Encontra um usuário pelo ID
@@ -27,8 +28,28 @@ export class UserService {
     });
   }
 
-  // Cria um novo usuário (usado pelo AuthService no cadastro)
-  // Recebe email e a senha JÁ HASHADA
+  async updateSettings(
+    userId: number,
+    settings: UpdateUserSettingsDto,
+  ): Promise<Omit<User, 'password'>> {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: settings,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...result } = updatedUser;
+      return result;
+    } catch (error) {
+      this.logger?.error?.(
+        `Erro ao atualizar configurações do usuário ${userId}`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'Não foi possível salvar as configurações.',
+      );
+    }
+  }
   async create(data: Prisma.UserCreateInput): Promise<User> {
     // A verificação se o email já existe geralmente é feita antes de chamar create,
     // mas o Prisma lançará um erro P2002 se tentarmos criar com email duplicado.
