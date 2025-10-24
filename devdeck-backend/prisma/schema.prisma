@@ -1,8 +1,8 @@
 // schema.prisma
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = "postgresql://postgres.joxyrrlqrbaovwzhbnlr:8XsSadZAGtPvBhQJ@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
 }
 
 generator client {
