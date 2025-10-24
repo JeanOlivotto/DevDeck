@@ -1,8 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = 'https://dev-deck-api.vercel.app/api';
 const TOKEN_KEY = 'devdeck_auth_token';
 const USER_EMAIL_KEY = 'devdeck_user_email';
 const USER_NAME_KEY = 'devdeck_user_name';
-const WS_URL = import.meta.env.VITE_API_WS_URL || 'http://localhost:3000';
+const WS_URL = 'https://dev-deck-api.vercel.app';
 
 const loadingIndicator = document.getElementById('loading-indicator');
 const appContainer = document.getElementById('app-container');
