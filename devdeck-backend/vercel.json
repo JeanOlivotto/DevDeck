@@ -32,12 +32,6 @@
   "env": {
     "NODE_ENV": "production",
     "NODE_OPTIONS": "--max-old-space-size=1024"
-  },
-  "functions": {
-    "dist/main.js": {
-      "memory": 1024,
-      "maxDuration": 30,
-      "excludeFiles": "public/**"
-    }
   }
+
 }
