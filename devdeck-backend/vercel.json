@@ -1,15 +1,43 @@
 {
   "version": 2,
+  "buildCommand": "npm run build && npx prisma generate && npx prisma migrate deploy",
+  "installCommand": "npm install",
+  "framework": "nestjs",
   "builds": [
     {
-      "src": "dist/main.js", 
-      "use": "@vercel/node"  
+      "src": "dist/main.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "nodeVersion": "20.x"
+      }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",      
-      "dest": "dist/main.js" 
+      "src": "/api/(.*)",
+      "dest": "dist/main.js",
+      "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
+    },
+    {
+      "src": "/whatsapp(.*)",
+      "dest": "dist/main.js",
+      "methods": ["GET", "POST"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "dist/main.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "NODE_OPTIONS": "--max-old-space-size=1024"
+  },
+  "functions": {
+    "dist/main.js": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "excludeFiles": "public/**"
+    }
+  }
 }
