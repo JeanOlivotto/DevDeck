@@ -25,14 +25,18 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api`);
-  console.log(`WebSocket is running on ws://localhost:${port}`);
+
+  try {
+    await app.listen(port);
+    console.log(`Application is running on: http://localhost:${port}/api`);
+    console.log(`WebSocket is running on ws://localhost:${port}`);
+  } catch (error) {
+    console.error('Erro ao iniciar servidor:', error);
+    process.exit(1);
+  }
 }
 
 bootstrap().catch((err) => {
-  console.error('Erro ao iniciar aplicação:', err);
+  console.error('Erro fatal na inicialização:', err);
   process.exit(1);
 });
-
-export default bootstrap;
