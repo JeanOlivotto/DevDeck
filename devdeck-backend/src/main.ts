@@ -29,4 +29,10 @@ async function bootstrap() {
   console.log(`Application is running on: http://localhost:${port}/api`);
   console.log(`WebSocket is running on ws://localhost:${port}`);
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error('Erro ao iniciar aplicação:', err);
+  process.exit(1);
+});
+
+export default bootstrap;

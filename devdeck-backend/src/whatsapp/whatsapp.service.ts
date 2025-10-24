@@ -1,17 +1,13 @@
+/* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable no-empty */
-/* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-implied-eval */
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
-/* eslint-disable @typescript-eslint/no-misused-promises */
 import {
   Injectable,
   Logger,
@@ -22,8 +18,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as qrcode from 'qrcode';
 import { WhatsappGateway } from './whatsapp.gateway';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 // Dynamic imports para ESM modules
 let makeWASocket: any;
@@ -31,7 +25,6 @@ let DisconnectReason: any;
 let fetchLatestBaileysVersion: any;
 let Browsers: any;
 let useMultiFileAuthState: any;
-let Boom: any;
 
 // Função para inicializar imports ESM
 async function initializeBaileysImports() {
@@ -43,9 +36,6 @@ async function initializeBaileysImports() {
   fetchLatestBaileysVersion = baileysModule.fetchLatestBaileysVersion;
   Browsers = baileysModule.Browsers;
   useMultiFileAuthState = baileysModule.useMultiFileAuthState;
-
-  const boomModule = await import('@hapi/boom');
-  Boom = boomModule.Boom;
 }
 
 const pino = (opts?: any) => ({
@@ -96,35 +86,40 @@ const pino = (opts?: any) => ({
 });
 const loggerPino = pino();
 
+// Mock de useMultiFileAuthState para Vercel (sem filesystem)
+const createMockAuthState = () => {
+  let creds: any = null;
+
+  return {
+    state: {
+      creds: creds,
+      keys: {
+        get: (type: any, jids: any) => {
+          return {};
+        },
+        set: (data: any) => {},
+        del: (type: any, jids: any) => {},
+      },
+    },
+    saveCreds: () => {
+      // No-op no Vercel
+    },
+  };
+};
+
 @Injectable()
 export class WhatsappService implements OnModuleDestroy {
   private readonly logger = new Logger(WhatsappService.name);
   private activeSockets = new Map<number, any>();
-  private readonly SESSIONS_DIR = path.join(
-    __dirname,
-    '..',
-    '..',
-    'whatsapp_sessions',
-  );
 
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => WhatsappGateway))
     private whatsappGateway: WhatsappGateway,
   ) {
-    this.ensureSessionsDirExists();
-  }
-
-  private async ensureSessionsDirExists() {
-    try {
-      await fs.mkdir(this.SESSIONS_DIR, { recursive: true });
-      this.logger.log(`Diretório de sessões garantido: ${this.SESSIONS_DIR}`);
-    } catch (error) {
-      this.logger.error(
-        `Falha ao criar diretório de sessões: ${this.SESSIONS_DIR}`,
-        (error as Error).stack,
-      );
-    }
+    this.logger.warn(
+      '⚠️ WhatsApp em Vercel: Sessões NÃO persistem entre deploys. Para produção, use Railway ou Render.',
+    );
   }
 
   async onModuleDestroy() {
@@ -174,13 +169,12 @@ export class WhatsappService implements OnModuleDestroy {
     this.logger.log(`Inicializando novo socket para usuário ${userId}`);
     this.whatsappGateway.sendStatusUpdate(userId, 'connecting');
 
-    const sessionDir = path.join(this.SESSIONS_DIR, `user_${userId}`);
-    await fs.mkdir(sessionDir, { recursive: true });
-
     try {
-      const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+      // Use mock auth state em vez de filesystem
+      const { state, saveCreds } = createMockAuthState();
+
       this.logger.debug(
-        `[User ${userId}] Estado de autenticação carregado/inicializado de ${sessionDir}`,
+        `[User ${userId}] Estado de autenticação inicializado (mock)`,
       );
 
       let version: [number, number, number] | undefined = undefined;
@@ -255,15 +249,10 @@ export class WhatsappService implements OnModuleDestroy {
             this.logger.debug(
               `[User ${userId}] QR Data URL gerada: ${qrDataURL.substring(0, 50)}...`,
             );
-            if (!qrDataURL || !qrDataURL.startsWith('data:image/png;base64,')) {
-              this.logger.error(
-                `[User ${userId}] QR Data URL gerada parece inválida!`,
-              );
-            }
             this.whatsappGateway.sendQrToUser(userId, qrDataURL);
           } catch (err) {
             this.logger.error(
-              `[User ${userId}] Erro ao gerar QR Code para URL de dados`,
+              `[User ${userId}] Erro ao gerar QR Code`,
               (err as Error).stack,
             );
           }
@@ -274,17 +263,14 @@ export class WhatsappService implements OnModuleDestroy {
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
           this.logger.error(
-            `Conexão fechada para ${userId} | Motivo: ${DisconnectReason[statusCode as number] || 'Desconhecido'} (${statusCode}) | Reconectando: ${shouldReconnect}`,
+            `Conexão fechada para ${userId} | Motivo: ${DisconnectReason[statusCode as number] || 'Desconhecido'} (${statusCode})`,
             errorStack,
           );
 
           this.activeSockets.delete(userId);
 
           if (!shouldReconnect) {
-            this.logger.warn(
-              `Logout permanente ou erro crítico (${statusCode}) para usuário ${userId}. Removendo diretório da sessão.`,
-            );
-            await this.removeSessionDir(userId);
+            this.logger.warn(`Logout permanente para usuário ${userId}.`);
             this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
           } else {
             this.logger.log(
@@ -297,7 +283,7 @@ export class WhatsappService implements OnModuleDestroy {
               );
               void this.initializeSocketForUser(userId).catch((e) =>
                 this.logger.error(
-                  `[User ${userId}] Erro CRÍTICO durante tentativa de reconexão`,
+                  `[User ${userId}] Erro durante reconexão`,
                   (e as Error).stack,
                 ),
               );
@@ -320,25 +306,7 @@ export class WhatsappService implements OnModuleDestroy {
         (error as Error).stack,
       );
       this.activeSockets.delete(userId);
-      await this.removeSessionDir(userId);
       this.whatsappGateway.sendStatusUpdate(userId, 'error');
-    }
-  }
-
-  private async removeSessionDir(userId: number): Promise<void> {
-    const sessionDir = path.join(this.SESSIONS_DIR, `user_${userId}`);
-    try {
-      await fs.rm(sessionDir, { recursive: true, force: true });
-      this.logger.log(
-        `Diretório da sessão removido para usuário ${userId}: ${sessionDir}`,
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        this.logger.error(
-          `Falha ao remover diretório da sessão para usuário ${userId}: ${sessionDir}`,
-          (error as Error).stack,
-        );
-      }
     }
   }
 
@@ -357,20 +325,7 @@ export class WhatsappService implements OnModuleDestroy {
     if (sock) {
       return sock.user ? 'open' : 'connecting';
     }
-    const sessionDir = path.join(this.SESSIONS_DIR, `user_${userId}`);
-    try {
-      await fs.access(sessionDir);
-      return 'close';
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return 'logged_out';
-      }
-      this.logger.error(
-        `Erro ao verificar diretório da sessão para ${userId}: ${sessionDir}`,
-        (error as Error).stack,
-      );
-      return 'error';
-    }
+    return 'logged_out';
   }
 
   async sendMessage(
@@ -413,26 +368,20 @@ export class WhatsappService implements OnModuleDestroy {
       this.logger.log(`Tentando desconectar usuário ${userId}...`);
       try {
         await sock.logout(`Desconectado pelo usuário via App.`);
-        this.logger.log(
-          `Logout via sock.logout() bem-sucedido para ${userId}.`,
-        );
+        this.logger.log(`Logout bem-sucedido para ${userId}.`);
       } catch (logoutError) {
         this.logger.warn(
-          `Erro durante sock.logout() para ${userId} (pode já estar desconectado):`,
+          `Erro durante logout para ${userId}:`,
           (logoutError as Error).message,
         );
         try {
-          sock.end(new Error('Forçando desconexão após erro no logout'));
+          sock.end(new Error('Forçando desconexão'));
         } catch (e) {}
         this.activeSockets.delete(userId);
-        await this.removeSessionDir(userId);
         this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
       }
     } else {
-      this.logger.warn(
-        `Nenhum socket ativo para desconectar ${userId}, limpando diretório da sessão.`,
-      );
-      await this.removeSessionDir(userId);
+      this.logger.warn(`Nenhum socket ativo para desconectar ${userId}.`);
       this.whatsappGateway.sendStatusUpdate(userId, 'logged_out');
     }
   }
