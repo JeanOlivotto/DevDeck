@@ -13,30 +13,40 @@
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import {
-  makeWASocket,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  Browsers,
-  AuthenticationCreds,
-  WASocket,
-  AuthenticationState,
-  SignalKeyStore,
-  useMultiFileAuthState,
-} from '@whiskeysockets/baileys';
-import {
   Injectable,
   Logger,
   OnModuleDestroy,
   Inject,
   forwardRef,
-  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as qrcode from 'qrcode';
-import { Boom } from '@hapi/boom';
 import { WhatsappGateway } from './whatsapp.gateway';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+
+// Dynamic imports para ESM modules
+let makeWASocket: any;
+let DisconnectReason: any;
+let fetchLatestBaileysVersion: any;
+let Browsers: any;
+let useMultiFileAuthState: any;
+let Boom: any;
+
+// Função para inicializar imports ESM
+async function initializeBaileysImports() {
+  if (makeWASocket) return; // Já inicializado
+
+  const baileysModule = await import('@whiskeysockets/baileys');
+  makeWASocket = baileysModule.makeWASocket;
+  DisconnectReason = baileysModule.DisconnectReason;
+  fetchLatestBaileysVersion = baileysModule.fetchLatestBaileysVersion;
+  Browsers = baileysModule.Browsers;
+  useMultiFileAuthState = baileysModule.useMultiFileAuthState;
+
+  const boomModule = await import('@hapi/boom');
+  Boom = boomModule.Boom;
+}
 
 const pino = (opts?: any) => ({
   info: (...args: any[]) =>
@@ -89,7 +99,7 @@ const loggerPino = pino();
 @Injectable()
 export class WhatsappService implements OnModuleDestroy {
   private readonly logger = new Logger(WhatsappService.name);
-  private activeSockets = new Map<number, WASocket>();
+  private activeSockets = new Map<number, any>();
   private readonly SESSIONS_DIR = path.join(
     __dirname,
     '..',
@@ -140,6 +150,9 @@ export class WhatsappService implements OnModuleDestroy {
   }
 
   async initializeSocketForUser(userId: number): Promise<void> {
+    // Inicializa imports ESM
+    await initializeBaileysImports();
+
     const existingSock = this.activeSockets.get(userId);
     if (existingSock?.user) {
       this.logger.log(`Socket ativo reutilizado para usuário ${userId}`);
@@ -222,10 +235,10 @@ export class WhatsappService implements OnModuleDestroy {
       this.activeSockets.set(userId, sock);
       console.log(`[GATEWAY] Socket inicializado para ${userId}`);
 
-      sock.ev.on('connection.update', async (update) => {
+      sock.ev.on('connection.update', async (update: any) => {
         const { connection, lastDisconnect, qr } = update;
         const errorMessage =
-          (lastDisconnect?.error as Boom)?.message ||
+          (lastDisconnect?.error as any)?.message ||
           (lastDisconnect?.error as Error)?.message;
         const errorStack = (lastDisconnect?.error as Error)?.stack;
         this.logger.debug(
@@ -235,20 +248,18 @@ export class WhatsappService implements OnModuleDestroy {
         if (qr) {
           this.logger.log(
             `[User ${userId}] QR String recebido do Baileys: ${qr}`,
-          ); // Log do QR original
+          );
           this.whatsappGateway.sendStatusUpdate(userId, 'request_qr');
           try {
             const qrDataURL = await qrcode.toDataURL(qr);
-            // *** ADICIONAR LOG AQUI ***
             this.logger.debug(
               `[User ${userId}] QR Data URL gerada: ${qrDataURL.substring(0, 50)}...`,
-            ); // Loga o início da Data URL
+            );
             if (!qrDataURL || !qrDataURL.startsWith('data:image/png;base64,')) {
               this.logger.error(
                 `[User ${userId}] QR Data URL gerada parece inválida!`,
               );
             }
-            // *** FIM DO LOG ***
             this.whatsappGateway.sendQrToUser(userId, qrDataURL);
           } catch (err) {
             this.logger.error(
@@ -259,8 +270,7 @@ export class WhatsappService implements OnModuleDestroy {
         }
 
         if (connection === 'close') {
-          const statusCode = (lastDisconnect?.error as Boom)?.output
-            ?.statusCode;
+          const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
           const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
           this.logger.error(
@@ -285,7 +295,7 @@ export class WhatsappService implements OnModuleDestroy {
               this.logger.log(
                 `[User ${userId}] Iniciando tentativa de reconexão...`,
               );
-              this.initializeSocketForUser(userId).catch((e) =>
+              void this.initializeSocketForUser(userId).catch((e) =>
                 this.logger.error(
                   `[User ${userId}] Erro CRÍTICO durante tentativa de reconexão`,
                   (e as Error).stack,
