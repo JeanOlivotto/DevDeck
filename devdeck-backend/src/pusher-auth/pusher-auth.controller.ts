@@ -8,6 +8,8 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Pusher from 'pusher';
@@ -18,10 +20,10 @@ export class PusherAuthController {
   private pusher: Pusher;
 
   constructor(private configService: ConfigService) {
-    const appId = this.configService.get<string>('PUSHER_APP_ID');
-    const key = this.configService.get<string>('PUSHER_KEY');
-    const secret = this.configService.get<string>('PUSHER_SECRET');
-    const cluster = this.configService.get<string>('PUSHER_CLUSTER');
+    const appId = '2068385';
+    const key = 'c4f7fea1d37fea1c1c73';
+    const secret = 'fbbf9c225f9d67c9504f';
+    const cluster = 'us2';
 
     if (!appId || !key || !secret || !cluster) {
       throw new Error('Missing Pusher configuration environment variables');
@@ -38,6 +40,7 @@ export class PusherAuthController {
 
   @Post('auth')
   @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
   authenticateUser(
     @Req() req,
     @Body('socket_id') socketId: string,
