@@ -1,28 +1,16 @@
-/* eslint-disable @typescript-eslint/require-await */
+// devdeck-backend/src/whatsapp/whatsapp.module.ts
 import { Module } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappGateway } from './whatsapp.gateway';
-import { JwtModule } from '@nestjs/jwt'; // Necessário para o Gateway autenticar
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { WhatsappController } from './whatsapp.controller';
+import { ConfigModule } from '@nestjs/config';
 import { EncryptionModule } from 'src/encryption/encryption.module';
-// EncryptionModule já é global
-// PrismaModule já é global
+import { PrismaModule } from 'src/prisma/prisma.module';
 
 @Module({
-  imports: [
-    ConfigModule, // Garante que ConfigService esteja disponível
-    EncryptionModule,
-    JwtModule.registerAsync({
-      // Configura JwtModule para o Gateway
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'), // Use sua variável .env
-        // signOptions: { expiresIn: '...', }, // Opcional se precisar assinar
-      }),
-      inject: [ConfigService],
-    }),
-  ],
+  imports: [ConfigModule, EncryptionModule, PrismaModule],
+  controllers: [WhatsappController],
   providers: [WhatsappService, WhatsappGateway],
-  exports: [WhatsappService, WhatsappGateway], // Exporta o serviço para ser usado em NotificationService
+  exports: [WhatsappService, WhatsappGateway],
 })
 export class WhatsappModule {}

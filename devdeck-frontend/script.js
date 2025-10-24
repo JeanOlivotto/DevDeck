@@ -3,6 +3,9 @@ const TOKEN_KEY = 'devdeck_auth_token';
 const USER_EMAIL_KEY = 'devdeck_user_email';
 const USER_NAME_KEY = 'devdeck_user_name';
 const WS_URL = 'https://dev-deck-api.vercel.app';
+const PUSHER_KEY = 'c4f7fea1d37fea1c1c73'; // Substituir pela sua key do painel Pusher
+const PUSHER_CLUSTER = 'us2'; // Ex: 'us2', 'sa1', etc
+
 
 const loadingIndicator = document.getElementById('loading-indicator');
 const appContainer = document.getElementById('app-container');
@@ -89,7 +92,8 @@ let authToken = localStorage.getItem(TOKEN_KEY);
 let currentUserEmail = localStorage.getItem(USER_EMAIL_KEY);
 let currentUserName = localStorage.getItem(USER_NAME_KEY);
 let confirmResolve = null;
-let socket = null;
+let pusherClient = null;
+let pusherChannel = null;
 let currentUserSettings = {
     notifyDailySummary: true,
     notifyStaleTasks: true,
@@ -295,31 +299,100 @@ function updateToggleUI() {
 }
 
 function connectWebSocket() {
-    if (!authToken) { console.warn('Sem token, WebSocket não conectado.'); updateWhatsappUI('logged_out'); return; }
-    if (socket && socket.connected) { console.log('WebSocket já conectado.'); return; }
-    console.log('Tentando conectar WebSocket...');
-    socket = io(`${WS_URL}/whatsapp`, {
-        auth: { token: authToken },
-        reconnectionAttempts: 5,
-        transports: ['websocket']
-    });
-    socket.on('connect', () => { console.log('WebSocket Conectado:', socket.id); updateWhatsappUI('close'); }); // Initial state might be 'close' if no session exists
-    socket.on('disconnect', (reason) => { console.warn('WebSocket Desconectado:', reason); updateWhatsappUI('close'); }); // Assume 'close' on disconnect
-    socket.on('connect_error', (err) => { console.error('Erro de conexão WebSocket:', err.message); updateWhatsappUI('error'); });
-    socket.on('whatsapp_qr_code', (qrDataUrl) => {
-        console.log('QR Code recebido');
-        if (whatsappQrCodeImg) whatsappQrCodeImg.src = qrDataUrl;
-        updateWhatsappUI('request_qr'); // Update UI to show QR
-    });
-    socket.on('whatsapp_status_update', (payload) => {
-        const status = payload.status;
-        console.log('Status WhatsApp recebido:', status);
-        updateWhatsappUI(status);
-    });
+    if (!authToken) {
+        console.warn('Sem token, Pusher não conectado.');
+        updateWhatsappUI('logged_out');
+        return;
+    }
+
+    if (pusherClient) {
+        console.log('Pusher já conectado.');
+        return;
+    }
+
+    console.log('Conectando ao Pusher...');
+    
+    try {
+        // Decodificar token JWT para obter userId
+        const tokenPayload = jwt_decode(authToken);
+        const userId = tokenPayload.sub;
+        
+        if (!userId) {
+            console.error('Não foi possível obter userId do token');
+            updateWhatsappUI('error');
+            return;
+        }
+
+        // Inicializar Pusher
+        pusherClient = new Pusher(PUSHER_KEY, {
+            cluster: PUSHER_CLUSTER,
+            encrypted: true,
+            authEndpoint: `${API_BASE_URL}/pusher/auth`,
+            auth: {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            }
+        });
+
+        // Assinar canal privado do usuário
+        pusherChannel = pusherClient.subscribe(`private-user-${userId}`);
+
+        pusherChannel.bind('pusher:subscription_succeeded', () => {
+            console.log('Conectado ao Pusher com sucesso!');
+            // Buscar estado inicial
+            fetchInitialWhatsappState();
+        });
+
+        pusherChannel.bind('pusher:subscription_error', (error) => {
+            console.error('Erro ao conectar Pusher:', error);
+            updateWhatsappUI('error');
+        });
+
+        // Receber QR Code
+        pusherChannel.bind('whatsapp_qr_code', (data) => {
+            console.log('QR Code recebido via Pusher');
+            if (whatsappQrCodeImg && data.qr) {
+                whatsappQrCodeImg.src = data.qr;
+            }
+            updateWhatsappUI('request_qr');
+        });
+
+        // Receber atualizações de status
+        pusherChannel.bind('whatsapp_status_update', (data) => {
+            console.log('Status WhatsApp recebido:', data.status);
+            updateWhatsappUI(data.status);
+        });
+
+    } catch (error) {
+        console.error('Erro ao inicializar Pusher:', error);
+        updateWhatsappUI('error');
+    }
 }
 
 function disconnectWebSocket() {
-    if (socket) { console.log('Desconectando WebSocket...'); socket.disconnect(); socket = null; }
+    if (pusherClient) {
+        console.log('Desconectando Pusher...');
+        if (pusherChannel) {
+            pusherChannel.unbind_all();
+            pusherClient.unsubscribe(pusherChannel.name);
+        }
+        pusherClient.disconnect();
+        pusherClient = null;
+        pusherChannel = null;
+    }
+}
+
+// 6. ADICIONAR função para buscar estado inicial:
+async function fetchInitialWhatsappState() {
+    try {
+        const response = await fetchApi('/whatsapp/status');
+        if (response && response.status) {
+            updateWhatsappUI(response.status);
+        }
+    } catch (error) {
+        console.error('Erro ao buscar estado inicial:', error);
+    }
 }
 
 function updateWhatsappUI(status) {
@@ -567,23 +640,69 @@ showSignupLink.addEventListener('click', showSignupView);
 showLoginLink.addEventListener('click', showLoginView);
 logoutButton.addEventListener('click', logout);
 
-whatsappConnectBtn.addEventListener('click', () => {
-    if (socket && socket.connected) { if (whatsappStatusText) whatsappStatusText.textContent = 'Status: Solicitando conexão...'; socket.emit('request_whatsapp_connect'); }
-    else { showAlert('Conexão WebSocket não estabelecida. Tentando reconectar...'); connectWebSocket(); setTimeout(() => { if (socket && socket.connected) { socket.emit('request_whatsapp_connect'); } else { showAlert('Falha ao reconectar WebSocket.'); } }, 2000); }
+whatsappConnectBtn.addEventListener('click', async () => {
+    if (!pusherClient) {
+        showAlert('Conexão Pusher não estabelecida. Tentando reconectar...');
+        connectWebSocket();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    try {
+        if (whatsappStatusText) {
+            whatsappStatusText.textContent = 'Status: Solicitando conexão...';
+        }
+        
+        const response = await fetchApi('/whatsapp/connect', { method: 'POST' });
+        
+        if (response && response.success) {
+            console.log('Solicitação de conexão enviada');
+        }
+    } catch (error) {
+        console.error('Erro ao solicitar conexão:', error);
+        showAlert(`Erro: ${error.message}`);
+    }
 });
-whatsappDisconnectBtn.addEventListener('click', () => {
-    if (socket && socket.connected) { if (whatsappStatusText) whatsappStatusText.textContent = 'Status: Desconectando...'; socket.emit('disconnect_whatsapp'); }
-    else { updateWhatsappUI('logged_out'); showAlert('WebSocket já estava desconectado.'); console.warn('Socket não conectado, desconexão não enviada.'); }
+whatsappDisconnectBtn.addEventListener('click', async () => {
+    try {
+        if (whatsappStatusText) {
+            whatsappStatusText.textContent = 'Status: Desconectando...';
+        }
+        
+        const response = await fetchApi('/whatsapp/disconnect', { method: 'POST' });
+        
+        if (response && response.success) {
+            console.log('Desconexão solicitada');
+        }
+    } catch (error) {
+        console.error('Erro ao desconectar:', error);
+        showAlert(`Erro: ${error.message}`);
+    }
 });
-whatsappTestBtn.addEventListener('click', () => {
-    if (!socket || !socket.connected) { showAlert('Erro: WebSocket não está conectado.'); return; }
-    if (whatsappStatusText.textContent !== 'Status: Conectado') { showAlert('Erro: O WhatsApp não está conectado.'); return; }
-    if (!currentUserSettings.whatsappNumber) { showAlert('Erro: Número do WhatsApp não configurado.'); return; }
-    console.log(`[Frontend] Enviando 'send_test_message' para ${currentUserSettings.whatsappNumber}`);
-    socket.emit('send_test_message', {}, (response) => {
-        if (response?.success) { showAlert(`Mensagem de teste enviada para ${currentUserSettings.whatsappNumber}!`, 'Sucesso'); }
-        else { showAlert(`Falha ao enviar: ${response?.error || 'Erro desconhecido'}`, 'Erro'); }
-    });
+whatsappTestBtn.addEventListener('click', async () => {
+    if (whatsappStatusText.textContent !== 'Status: Conectado') {
+        showAlert('Erro: O WhatsApp não está conectado.');
+        return;
+    }
+    
+    if (!currentUserSettings.whatsappNumber) {
+        showAlert('Erro: Número do WhatsApp não configurado.');
+        return;
+    }
+    
+    try {
+        console.log('[Frontend] Enviando mensagem de teste...');
+        const response = await fetchApi('/whatsapp/test-message', { method: 'POST' });
+        
+        if (response && response.success) {
+            showAlert(
+                `Mensagem de teste enviada para ${currentUserSettings.whatsappNumber}!`,
+                'Sucesso'
+            );
+        }
+    } catch (error) {
+        console.error('Erro ao enviar teste:', error);
+        showAlert(`Falha ao enviar: ${error.message}`, 'Erro');
+    }
 });
 
 toggleWhatsApp.addEventListener('change', (e) => { const wantsWhatsApp = e.target.checked; currentUserSettings.notifyViaWhatsApp = wantsWhatsApp; updateUserSettings({ notifyViaWhatsApp: wantsWhatsApp }); });

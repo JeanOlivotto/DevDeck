@@ -17,6 +17,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { EncryptionService } from './encryption/encryption.service';
 import { WhatsappService } from './whatsapp/whatsapp.service';
+import { PusherAuthController } from './pusher-auth/pusher-auth.controller';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { WhatsappService } from './whatsapp/whatsapp.service';
     WhatsappModule,
     EncryptionModule,
   ],
-  controllers: [AuthController, UserController],
+  controllers: [AuthController, UserController, PusherAuthController],
   providers: [
     UserService,
     AuthService,
