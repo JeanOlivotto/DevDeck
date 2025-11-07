@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // src/board/board.controller.ts
 import {
   Controller,
@@ -12,10 +15,13 @@ import {
   Delete,
   UseGuards,
   Req, // Mantido
-  ConflictException,
 } from '@nestjs/common';
 import { BoardService } from './board.service';
-import { CreateBoardDto, UpdateBoardDto } from './dto/board.dto';
+import {
+  CreateBoardDto,
+  UpdateBoardDto,
+  ReorderBoardsDto,
+} from './dto/board.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('boards')
@@ -36,6 +42,13 @@ export class BoardController {
     const userId = req.user.userId;
     // CORREÇÃO: Passar userId
     return this.boardService.findAll(userId); // <--- CORRIGIDO
+  }
+
+  @Patch('reorder')
+  @HttpCode(HttpStatus.OK)
+  reorder(@Body() reorderBoardsDto: ReorderBoardsDto, @Req() req) {
+    const userId = req.user.userId;
+    return this.boardService.reorderBoards(reorderBoardsDto, userId);
   }
 
   // findOne, update, remove já estavam corretos, passando userId

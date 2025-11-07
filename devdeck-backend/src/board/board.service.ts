@@ -1,8 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Injectable,
   NotFoundException,
@@ -13,7 +9,11 @@ import {
   ForbiddenException, // <-- Importe ForbiddenException
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateBoardDto, UpdateBoardDto } from './dto/board.dto';
+import {
+  CreateBoardDto,
+  UpdateBoardDto,
+  ReorderBoardsDto,
+} from './dto/board.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -58,7 +58,7 @@ export class BoardService implements OnModuleInit {
     return await this.prisma.board.findMany({
       where: { userId: userId }, // Filtra quadros pelo usuário logado
       include: { tasks: { orderBy: { createdAt: 'asc' } } },
-      orderBy: { id: 'asc' },
+      orderBy: { order: 'asc' }, // Ordena por order ao invés de id
     });
   }
 
@@ -145,5 +145,37 @@ export class BoardService implements OnModuleInit {
       );
       throw error;
     }
+  }
+
+  // Novo método para reordenar quadros
+  async reorderBoards(reorderDto: ReorderBoardsDto, userId: number) {
+    // Verifica se todos os quadros pertencem ao usuário
+    const boardIds = reorderDto.boards.map((b) => b.id);
+    const userBoards = await this.prisma.board.findMany({
+      where: {
+        id: { in: boardIds },
+        userId: userId,
+      },
+      select: { id: true },
+    });
+
+    if (userBoards.length !== boardIds.length) {
+      throw new ForbiddenException(
+        'Você não tem permissão para reordenar alguns desses quadros.',
+      );
+    }
+
+    // Atualiza a ordem de cada quadro
+    const updatePromises = reorderDto.boards.map((board) =>
+      this.prisma.board.update({
+        where: { id: board.id },
+        data: { order: board.order },
+      }),
+    );
+
+    await Promise.all(updatePromises);
+
+    // Retorna os quadros atualizados
+    return await this.findAll(userId);
   }
 }

@@ -177,6 +177,13 @@ body {
     font-weight: 600;
 }
 
+.board-button.drag-over-board {
+    background-color: rgba(0, 234, 255, 0.2);
+    border-color: #00eaff;
+    border-style: dashed;
+    transform: scale(1.05);
+}
+
 .board-action-icon {
     opacity: 0.5;
     transition: opacity 0.2s ease;

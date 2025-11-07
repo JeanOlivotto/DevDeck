@@ -88,6 +88,7 @@ const whatsappTestBtn = document.getElementById('whatsapp-test-btn');
 let currentBoardId = null;
 let allBoards = [];
 let draggedTaskElement = null;
+let draggedBoardElement = null;
 let authToken = localStorage.getItem(TOKEN_KEY);
 let currentUserEmail = localStorage.getItem(USER_EMAIL_KEY);
 let currentUserName = localStorage.getItem(USER_NAME_KEY);
@@ -275,6 +276,12 @@ async function updateBoard(boardId, boardData) {
     }
 }
 async function deleteBoard(boardId) { return await fetchApi(`/boards/${boardId}`, { method: 'DELETE' }); }
+async function reorderBoards(boardsOrder) {
+    return await fetchApi('/boards/reorder', { 
+        method: 'PATCH', 
+        body: JSON.stringify({ boards: boardsOrder }) 
+    });
+}
 
 function getInitials(name) {
     if (!name) return '?';
@@ -467,8 +474,13 @@ function showKanbanView() {
 
 function renderBoardSelectors(boards) {
     boardsContainer.innerHTML = '';
-    boards.forEach(board => {
-        const button = document.createElement('button'); button.className = 'board-button'; button.dataset.boardId = board.id;
+    boards.forEach((board, index) => {
+        const button = document.createElement('button'); 
+        button.className = 'board-button'; 
+        button.dataset.boardId = board.id;
+        button.dataset.boardOrder = index;
+        button.draggable = true;
+        
         const nameSpan = document.createElement('span'); nameSpan.textContent = board.name; button.appendChild(nameSpan);
         const iconsDiv = document.createElement('div'); iconsDiv.className = 'flex items-center gap-2 ml-2';
         const renameSVG = `<svg class="board-action-icon rename-icon w-4 h-4"><use xlink:href="#icon-pencil"></use></svg>`;
@@ -478,6 +490,15 @@ function renderBoardSelectors(boards) {
         iconsDiv.querySelector('.delete-icon').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteBoard(board.id, board.name); });
         button.appendChild(iconsDiv);
         button.addEventListener('click', () => handleBoardSelection(board.id));
+        
+        // Event listeners para drag and drop
+        button.addEventListener('dragstart', handleBoardDragStart);
+        button.addEventListener('dragend', handleBoardDragEnd);
+        button.addEventListener('dragover', handleBoardDragOver);
+        button.addEventListener('drop', handleBoardDrop);
+        button.addEventListener('dragenter', handleBoardDragEnter);
+        button.addEventListener('dragleave', handleBoardDragLeave);
+        
         boardsContainer.appendChild(button);
     });
     const newBtn = document.createElement('button'); newBtn.id = 'add-board-button';
@@ -487,6 +508,86 @@ function renderBoardSelectors(boards) {
 }
 
 function setActiveBoardUI(id) { document.querySelectorAll('.board-button').forEach(b => b.classList.toggle('active-board', parseInt(b.dataset.boardId, 10) === id)); }
+
+// Funções de Drag and Drop para Quadros
+function handleBoardDragStart(e) {
+    draggedBoardElement = e.target;
+    e.target.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target.innerHTML);
+}
+
+function handleBoardDragEnd(e) {
+    e.target.style.opacity = '1';
+    document.querySelectorAll('.board-button').forEach(btn => {
+        btn.classList.remove('drag-over-board');
+    });
+    draggedBoardElement = null;
+}
+
+function handleBoardDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleBoardDragEnter(e) {
+    if (e.target.classList.contains('board-button') && e.target !== draggedBoardElement) {
+        e.target.classList.add('drag-over-board');
+    }
+}
+
+function handleBoardDragLeave(e) {
+    if (e.target.classList.contains('board-button')) {
+        e.target.classList.remove('drag-over-board');
+    }
+}
+
+function handleBoardDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    e.preventDefault();
+    
+    if (draggedBoardElement && e.target.classList.contains('board-button') && draggedBoardElement !== e.target) {
+        const draggedId = parseInt(draggedBoardElement.dataset.boardId, 10);
+        const targetId = parseInt(e.target.dataset.boardId, 10);
+        
+        // Reordenar visualmente
+        const draggedIndex = allBoards.findIndex(b => b.id === draggedId);
+        const targetIndex = allBoards.findIndex(b => b.id === targetId);
+        
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+            // Remove o elemento arrastado e insere na nova posição
+            const [draggedBoard] = allBoards.splice(draggedIndex, 1);
+            allBoards.splice(targetIndex, 0, draggedBoard);
+            
+            // Re-renderizar os quadros
+            renderBoardSelectors(allBoards);
+            setActiveBoardUI(currentBoardId);
+            
+            // Atualizar no backend
+            reorderBoardsInBackend();
+        }
+    }
+    
+    return false;
+}
+
+async function reorderBoardsInBackend() {
+    try {
+        const boardsOrder = allBoards.map((board, index) => ({
+            id: board.id,
+            order: index
+        }));
+        await reorderBoards(boardsOrder);
+    } catch (error) {
+        console.error('Erro ao reordenar quadros:', error);
+        showAlert('Erro ao salvar nova ordem dos quadros.');
+    }
+}
 
 function renderTasks(tasks) {
     document.querySelectorAll('.tasks').forEach(c => c.innerHTML = '');
