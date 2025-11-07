@@ -18,6 +18,7 @@ import { EncryptionModule } from './encryption/encryption.module';
 import { EncryptionService } from './encryption/encryption.service';
 import { WhatsappService } from './whatsapp/whatsapp.service';
 import { PusherAuthController } from './pusher-auth/pusher-auth.controller';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { PusherAuthController } from './pusher-auth/pusher-auth.controller';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    PrismaModule, // Disponibiliza o PrismaService globalmente
+    ScheduleModule.forRoot(),
+    PrismaModule,
     BoardModule,
     TaskModule,
     UserModule,
