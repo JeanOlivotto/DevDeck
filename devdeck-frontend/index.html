@@ -42,7 +42,7 @@
                     </label>
                 </div>
                 <div class="p-4 border-b border-gray-700 space-y-3">
-                    <h4 class="text-sm font-semibold text-gray-400 mb-2">Notificações WhatsApp</h4>
+                    <h4 class="text-sm font-semibold text-gray-400 mb-2">Notificações WhatsApp (Meta API)</h4>
                     <label for="toggle-whatsapp" class="flex items-center justify-between cursor-pointer">
                         <span class="text-gray-300">Receber via WhatsApp</span>
                         <div class="relative"><input type="checkbox" id="toggle-whatsapp" class="sr-only toggle-checkbox" data-setting="notifyViaWhatsApp"><div class="toggle-bg bg-gray-600 border-2 border-gray-600 h-6 w-11 rounded-full"></div><div class="toggle-dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform"></div></div>
@@ -50,14 +50,50 @@
                     <div class="mt-2">
                         <label for="whatsapp-number-confirm" class="block text-sm font-medium mb-1 text-gray-400">Seu Nº WhatsApp (com + DDI):</label>
                         <input type="tel" id="whatsapp-number-confirm" placeholder="+5519999998888" class="modal-input w-full p-2 rounded text-sm" data-setting="whatsappNumber">
-                        <small class="text-xs text-gray-500 mt-1 block">Confirme seu número após conectar.</small>
+                        <small class="text-xs text-gray-500 mt-1 block">Confirme seu número após configurar.</small>
                     </div>
-                    <div id="whatsapp-connection-status" class="mt-3 text-center">
-                        <span id="whatsapp-status-text" class="text-sm text-gray-400">Status: Desconectado</span>
-                        <div id="whatsapp-qr-container" class="mt-2 hidden flex justify-center"><img id="whatsapp-qr-code" src="" alt="QR Code WhatsApp" class="w-40 h-40 border border-gray-600 rounded"></div>
-                        <button id="whatsapp-connect-btn" class="mt-3 w-full modal-button text-white text-sm font-semibold py-1.5 px-3 rounded-lg">Conectar WhatsApp</button>
-                        <button id="whatsapp-disconnect-btn" class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-1.5 px-3 rounded-lg hidden">Desconectar WhatsApp</button>
-                        <button id="whatsapp-test-btn" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-1.5 px-3 rounded-lg hidden">Enviar Mensagem Teste</button>
+                    
+                    <!-- Meta WhatsApp API Configuration -->
+                    <div class="mt-4 p-3 bg-[#1e223b] rounded-lg border border-gray-700">
+                        <div class="flex items-center justify-between mb-2">
+                            <h5 class="text-sm font-semibold text-cyan-400">🔑 Configurar Meta API</h5>
+                            <button id="whatsapp-meta-tutorial-btn" class="text-xs text-purple-400 hover:text-purple-300 underline">📖 Tutorial</button>
+                        </div>
+                        
+                        <!-- Status e Contador -->
+                        <div id="whatsapp-meta-status" class="mb-3 p-2 bg-[#23284a] rounded text-xs">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-gray-400">Status:</span>
+                                <span id="whatsapp-meta-status-text" class="text-gray-300">Não configurado</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-400">Mensagens este mês:</span>
+                                <span id="whatsapp-meta-counter" class="text-cyan-400 font-semibold">0/950</span>
+                            </div>
+                            <!-- Barra de progresso -->
+                            <div class="mt-2 w-full bg-gray-700 rounded-full h-1.5">
+                                <div id="whatsapp-meta-progress-bar" class="bg-cyan-400 h-1.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Formulário de credenciais -->
+                        <div id="whatsapp-meta-form" class="space-y-2">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Phone Number ID:</label>
+                                <input type="text" id="whatsapp-phone-number-id" placeholder="109876543210" class="modal-input w-full p-2 rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Access Token:</label>
+                                <input type="password" id="whatsapp-access-token" placeholder="EAA..." class="modal-input w-full p-2 rounded text-xs">
+                            </div>
+                            <div class="flex gap-2">
+                                <button id="whatsapp-meta-save-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-2 px-3 rounded-lg">💾 Salvar</button>
+                                <button id="whatsapp-meta-remove-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2 px-3 rounded-lg hidden">🗑️ Remover</button>
+                            </div>
+                        </div>
+
+                        <!-- Botão de teste -->
+                        <button id="whatsapp-meta-test-btn" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-3 rounded-lg hidden">📱 Enviar Teste</button>
                     </div>
                 </div>
                 <div class="p-2">
@@ -168,6 +204,96 @@
             <p id="info-modal-description" class="text-gray-300 mb-4">Descrição.</p>
             <p class="text-sm text-gray-400 mb-6">Enviado para: <span id="info-modal-email" class="font-medium text-gray-300"></span></p>
             <div class="flex justify-end"><button id="info-modal-close" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">Fechar</button></div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Meta Tutorial Modal -->
+    <div id="whatsapp-tutorial-modal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="modal-content p-6 rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-2xl font-semibold mb-4 text-cyan-300">📖 Tutorial: WhatsApp Meta Business API</h3>
+            
+            <div class="space-y-4 text-sm">
+                <!-- Passo 1 -->
+                <div class="p-4 bg-[#1e223b] rounded-lg border-l-4 border-cyan-400">
+                    <h4 class="font-semibold text-cyan-400 mb-2">1️⃣ Criar conta Meta for Developers</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-gray-300">
+                        <li>Acesse: <a href="https://developers.facebook.com" target="_blank" class="text-cyan-400 hover:underline">developers.facebook.com</a></li>
+                        <li>Faça login com sua conta Facebook/Instagram</li>
+                        <li>Clique em "Meus Apps" > "Criar App"</li>
+                        <li>Escolha tipo: <span class="text-purple-400 font-semibold">"Business"</span></li>
+                        <li>Nome do App: <span class="text-gray-400 italic">DevDeck WhatsApp</span></li>
+                    </ol>
+                </div>
+
+                <!-- Passo 2 -->
+                <div class="p-4 bg-[#1e223b] rounded-lg border-l-4 border-green-400">
+                    <h4 class="font-semibold text-green-400 mb-2">2️⃣ Adicionar produto WhatsApp</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-gray-300">
+                        <li>No painel do app, encontre <span class="font-semibold">"WhatsApp"</span></li>
+                        <li>Clique em <span class="text-green-400">"Configurar"</span></li>
+                        <li>Selecione ou crie uma conta Business</li>
+                        <li>Aceite os termos</li>
+                    </ol>
+                </div>
+
+                <!-- Passo 3 -->
+                <div class="p-4 bg-[#1e223b] rounded-lg border-l-4 border-purple-400">
+                    <h4 class="font-semibold text-purple-400 mb-2">3️⃣ Obter credenciais</h4>
+                    <p class="text-gray-300 mb-2">Na página do WhatsApp > "API Setup":</p>
+                    <div class="space-y-2">
+                        <div class="p-2 bg-[#23284a] rounded">
+                            <p class="text-xs text-gray-400 mb-1"><strong class="text-cyan-400">Phone Number ID:</strong></p>
+                            <p class="text-xs text-gray-300">Copie o número que aparece em "From"</p>
+                            <p class="text-xs text-gray-500 italic">Exemplo: 109876543210</p>
+                        </div>
+                        <div class="p-2 bg-[#23284a] rounded">
+                            <p class="text-xs text-gray-400 mb-1"><strong class="text-purple-400">Access Token:</strong></p>
+                            <p class="text-xs text-gray-300">Clique em "Generate Token" ou use o temporário</p>
+                            <p class="text-xs text-yellow-400">⚠️ Para permanente: Configurações > Básico > Gerar Token</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Passo 4 -->
+                <div class="p-4 bg-[#1e223b] rounded-lg border-l-4 border-blue-400">
+                    <h4 class="font-semibold text-blue-400 mb-2">4️⃣ Registrar número de teste</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-gray-300">
+                        <li>No painel WhatsApp > "API Setup"</li>
+                        <li>Role até "To" (destinatário)</li>
+                        <li>Clique em "Manage phone number list"</li>
+                        <li>Adicione seu número: <span class="text-gray-400">+5519999998888</span></li>
+                        <li>Você receberá um código via WhatsApp</li>
+                        <li>Cole o código para verificar ✅</li>
+                    </ol>
+                </div>
+
+                <!-- Informações importantes -->
+                <div class="p-4 bg-gradient-to-r from-cyan-900/30 to-purple-900/30 rounded-lg border border-cyan-500/30">
+                    <h4 class="font-semibold text-cyan-300 mb-2">💡 Informações Importantes</h4>
+                    <ul class="space-y-1 text-xs text-gray-300">
+                        <li>✅ <strong>1000 conversas/mês GRÁTIS</strong> para sempre</li>
+                        <li>✅ Limite do app: <strong>950 mensagens/mês</strong> (margem de segurança)</li>
+                        <li>✅ Reset automático: <strong>todo dia 1º</strong> do mês</li>
+                        <li>✅ Funciona na Vercel: <strong>API REST</strong>, sem WebSocket</li>
+                        <li>⚠️ Para produção (qualquer número): fazer <strong>verificação de negócio</strong></li>
+                        <li>📱 Números de teste: <strong>máximo 5 gratuitos</strong></li>
+                    </ul>
+                </div>
+
+                <!-- Links úteis -->
+                <div class="p-3 bg-[#1e223b] rounded-lg">
+                    <h4 class="font-semibold text-gray-400 mb-2 text-xs">🔗 Links Úteis</h4>
+                    <div class="space-y-1 text-xs">
+                        <a href="https://developers.facebook.com" target="_blank" class="block text-cyan-400 hover:underline">• Meta for Developers</a>
+                        <a href="https://developers.facebook.com/docs/whatsapp/cloud-api" target="_blank" class="block text-cyan-400 hover:underline">• Documentação WhatsApp Cloud API</a>
+                        <a href="https://business.facebook.com" target="_blank" class="block text-cyan-400 hover:underline">• Meta Business Manager</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end mt-6">
+                <button id="whatsapp-tutorial-close" class="modal-button text-white font-semibold py-2 px-6 rounded-lg">Entendi! 🚀</button>
+            </div>
         </div>
     </div>
 

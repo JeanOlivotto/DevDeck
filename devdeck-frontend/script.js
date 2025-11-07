@@ -1,10 +1,15 @@
-const API_BASE_URL = 'https://dev-deck-api.vercel.app/api';
+// Detecta ambiente automaticamente
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = IS_LOCAL ? 'http://localhost:3000/api' : 'https://dev-deck-api.vercel.app/api';
+const WS_URL = IS_LOCAL ? 'http://localhost:3000' : 'https://dev-deck-api.vercel.app';
 const TOKEN_KEY = 'devdeck_auth_token';
 const USER_EMAIL_KEY = 'devdeck_user_email';
 const USER_NAME_KEY = 'devdeck_user_name';
-const WS_URL = 'https://dev-deck-api.vercel.app';
 const PUSHER_KEY = 'c4f7fea1d37fea1c1c73'; // Substituir pela sua key do painel Pusher
 const PUSHER_CLUSTER = 'us2'; // Ex: 'us2', 'sa1', etc
+
+console.log('Environment:', IS_LOCAL ? 'LOCAL' : 'PRODUCTION');
+console.log('API_BASE_URL:', API_BASE_URL);
 
 
 const loadingIndicator = document.getElementById('loading-indicator');
@@ -78,12 +83,19 @@ const infoIcons = document.querySelectorAll('.info-icon');
 
 const toggleWhatsApp = document.getElementById('toggle-whatsapp');
 const whatsappNumberInput = document.getElementById('whatsapp-number-confirm');
-const whatsappConnectBtn = document.getElementById('whatsapp-connect-btn');
-const whatsappDisconnectBtn = document.getElementById('whatsapp-disconnect-btn');
-const whatsappStatusText = document.getElementById('whatsapp-status-text');
-const whatsappQrContainer = document.getElementById('whatsapp-qr-container');
-const whatsappQrCodeImg = document.getElementById('whatsapp-qr-code');
-const whatsappTestBtn = document.getElementById('whatsapp-test-btn');
+
+// WhatsApp Meta Elements
+const whatsappMetaTutorialBtn = document.getElementById('whatsapp-meta-tutorial-btn');
+const whatsappMetaTutorialModal = document.getElementById('whatsapp-tutorial-modal');
+const whatsappMetaTutorialClose = document.getElementById('whatsapp-tutorial-close');
+const whatsappMetaPhoneNumberIdInput = document.getElementById('whatsapp-phone-number-id');
+const whatsappMetaAccessTokenInput = document.getElementById('whatsapp-access-token');
+const whatsappMetaSaveBtn = document.getElementById('whatsapp-meta-save-btn');
+const whatsappMetaRemoveBtn = document.getElementById('whatsapp-meta-remove-btn');
+const whatsappMetaTestBtn = document.getElementById('whatsapp-meta-test-btn');
+const whatsappMetaStatusText = document.getElementById('whatsapp-meta-status-text');
+const whatsappMetaCounter = document.getElementById('whatsapp-meta-counter');
+const whatsappMetaProgressBar = document.getElementById('whatsapp-meta-progress-bar');
 
 let currentBoardId = null;
 let allBoards = [];
@@ -135,11 +147,13 @@ function openInfoModal(title, description, email) {
 function closeInfoModal() { infoModal.classList.add('hidden'); }
 
 async function fetchApi(endpoint, options = {}, isAuth = false) {
+    console.log('fetchApi called:', { endpoint, method: options.method, isAuth });
     loadingIndicator.classList.remove('hidden');
     const headers = { 'Content-Type': 'application/json', ...options.headers };
     if (!isAuth && authToken) { headers['Authorization'] = `Bearer ${authToken}`; }
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+        console.log('fetchApi response:', { endpoint, status: response.status, ok: response.ok });
         if (!response.ok) {
             if (response.status === 401 && !isAuth) {
                 console.warn('Token inválido/expirado. Logout.');
@@ -167,9 +181,11 @@ async function fetchApi(endpoint, options = {}, isAuth = false) {
 async function signup(email, password, name) { return await fetchApi('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, name }) }, true); }
 
 async function login(email, password) {
+    console.log('Login function called with:', { email, hasPassword: !!password });
     loginError.classList.add('hidden');
     try {
         const data = await fetchApi('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, true);
+        console.log('Login API response:', data);
         if (data?.access_token) {
             authToken = data.access_token;
             localStorage.setItem(TOKEN_KEY, authToken);
@@ -188,6 +204,7 @@ async function login(email, password) {
         } else { resetLocalUser(); }
         return data;
     } catch (error) {
+        console.error('Login error in function:', error);
         resetLocalUser();
         throw error;
     }
@@ -245,6 +262,162 @@ async function updateUserSettings(settingsData) {
         updateToggleUI();
     }
 }
+
+// ============= WhatsApp Meta API Functions =============
+async function loadWhatsAppMetaStatus() {
+    try {
+        const status = await fetchApi('/whatsapp-meta/status');
+        
+        // Atualiza o status de configuração
+        if (status.configured) {
+            whatsappMetaStatusText.textContent = '✅ Configurado';
+            whatsappMetaStatusText.className = 'text-green-400 font-semibold';
+            whatsappMetaSaveBtn.textContent = 'Atualizar';
+            whatsappMetaRemoveBtn.disabled = false;
+            whatsappMetaTestBtn.disabled = false;
+        } else {
+            whatsappMetaStatusText.textContent = '⚠️ Não configurado';
+            whatsappMetaStatusText.className = 'text-yellow-400 font-semibold';
+            whatsappMetaSaveBtn.textContent = 'Salvar';
+            whatsappMetaRemoveBtn.disabled = true;
+            whatsappMetaTestBtn.disabled = true;
+        }
+        
+        // Atualiza contador de mensagens
+        const messagesUsed = status.messagesUsed || 0;
+        const messagesLimit = 950; // Limite configurado no backend
+        whatsappMetaCounter.textContent = `${messagesUsed}/${messagesLimit}`;
+        
+        // Atualiza barra de progresso
+        const percentage = (messagesUsed / messagesLimit) * 100;
+        whatsappMetaProgressBar.style.width = `${percentage}%`;
+        
+        // Muda cor da barra baseado no uso
+        if (percentage >= 90) {
+            whatsappMetaProgressBar.className = 'h-full bg-red-500 rounded-full transition-all duration-300';
+        } else if (percentage >= 70) {
+            whatsappMetaProgressBar.className = 'h-full bg-yellow-500 rounded-full transition-all duration-300';
+        } else {
+            whatsappMetaProgressBar.className = 'h-full bg-cyan-500 rounded-full transition-all duration-300';
+        }
+        
+        // Mostra alerta se limite atingido
+        if (status.limitReached) {
+            showAlert('⚠️ Limite mensal de mensagens WhatsApp atingido (950/950). Reset no dia 1º do próximo mês.');
+        }
+        
+    } catch (error) {
+        console.error('Erro ao carregar status WhatsApp Meta:', error);
+        whatsappMetaStatusText.textContent = '❌ Erro ao carregar';
+        whatsappMetaStatusText.className = 'text-red-400 font-semibold';
+    }
+}
+
+async function saveWhatsAppMetaCredentials() {
+    const phoneNumberId = whatsappMetaPhoneNumberIdInput.value.trim();
+    const accessToken = whatsappMetaAccessTokenInput.value.trim();
+    
+    if (!phoneNumberId || !accessToken) {
+        showAlert('⚠️ Preencha Phone Number ID e Access Token');
+        return;
+    }
+    
+    try {
+        whatsappMetaSaveBtn.disabled = true;
+        whatsappMetaSaveBtn.textContent = 'Salvando...';
+        
+        await fetchApi('/whatsapp-meta/credentials', {
+            method: 'POST',
+            body: JSON.stringify({ phoneNumberId, accessToken })
+        });
+        
+        showAlert('✅ Credenciais WhatsApp Meta salvas com sucesso!');
+        await loadWhatsAppMetaStatus();
+        
+        // Limpa os campos por segurança
+        whatsappMetaPhoneNumberIdInput.value = '';
+        whatsappMetaAccessTokenInput.value = '';
+        
+    } catch (error) {
+        console.error('Erro ao salvar credenciais:', error);
+        showAlert(`❌ Erro ao salvar credenciais: ${error.message}`);
+    } finally {
+        whatsappMetaSaveBtn.disabled = false;
+        whatsappMetaSaveBtn.textContent = 'Salvar';
+    }
+}
+
+async function removeWhatsAppMetaCredentials() {
+    const confirmed = await showConfirm(
+        'Remover Configuração',
+        'Tem certeza que deseja remover as credenciais do WhatsApp Meta? Você não receberá mais notificações via WhatsApp.'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        whatsappMetaRemoveBtn.disabled = true;
+        whatsappMetaRemoveBtn.textContent = 'Removendo...';
+        
+        await fetchApi('/whatsapp-meta/credentials', { method: 'DELETE' });
+        
+        showAlert('✅ Credenciais WhatsApp Meta removidas com sucesso!');
+        await loadWhatsAppMetaStatus();
+        
+        // Limpa os campos
+        whatsappMetaPhoneNumberIdInput.value = '';
+        whatsappMetaAccessTokenInput.value = '';
+        
+    } catch (error) {
+        console.error('Erro ao remover credenciais:', error);
+        showAlert(`❌ Erro ao remover credenciais: ${error.message}`);
+    } finally {
+        whatsappMetaRemoveBtn.disabled = false;
+        whatsappMetaRemoveBtn.textContent = 'Remover';
+    }
+}
+
+async function sendWhatsAppMetaTest() {
+    const testNumber = prompt('Digite o número de WhatsApp para teste (formato: +5519999998888):');
+    
+    if (!testNumber) return;
+    
+    // Valida formato
+    const whatsappRegex = /^\+?\d{10,15}$/;
+    if (!whatsappRegex.test(testNumber)) {
+        showAlert('❌ Formato inválido. Use: +DDI DDD NÚMERO (Ex: +5519999998888)');
+        return;
+    }
+    
+    try {
+        whatsappMetaTestBtn.disabled = true;
+        whatsappMetaTestBtn.textContent = 'Enviando...';
+        
+        const result = await fetchApi('/whatsapp-meta/test', {
+            method: 'POST',
+            body: JSON.stringify({ to: testNumber })
+        });
+        
+        showAlert(`✅ Mensagem de teste enviada! Status: ${result.status}\nMensagens usadas: ${result.messagesUsed}/950`);
+        await loadWhatsAppMetaStatus(); // Atualiza contador
+        
+    } catch (error) {
+        console.error('Erro ao enviar teste:', error);
+        showAlert(`❌ Erro ao enviar teste: ${error.message}`);
+    } finally {
+        whatsappMetaTestBtn.disabled = false;
+        whatsappMetaTestBtn.textContent = 'Testar Envio';
+    }
+}
+
+function openWhatsAppMetaTutorial() {
+    whatsappMetaTutorialModal.classList.remove('hidden');
+}
+
+function closeWhatsAppMetaTutorial() {
+    whatsappMetaTutorialModal.classList.add('hidden');
+}
+// ============= End WhatsApp Meta API Functions =============
 
 async function getBoards() { return await fetchApi('/boards'); }
 async function createBoard(name) {
@@ -395,6 +568,27 @@ async function fetchInitialWhatsappState() {
     try {
         const response = await fetchApi('/whatsapp/status');
         if (response && response.status) {
+            // Se WhatsApp não está disponível na Vercel
+            if (response.status === 'unavailable' || response.available === false) {
+                updateWhatsappUI('unavailable');
+                if (whatsappStatusText) {
+                    whatsappStatusText.textContent = 'Status: Indisponível (Vercel)';
+                    whatsappStatusText.title = response.reason || 'WhatsApp não funciona em ambiente serverless';
+                }
+                // Desabilita os controles
+                if (whatsappConnectBtn) {
+                    whatsappConnectBtn.disabled = true;
+                    whatsappConnectBtn.style.opacity = '0.5';
+                    whatsappConnectBtn.style.cursor = 'not-allowed';
+                    whatsappConnectBtn.title = 'WhatsApp não disponível na Vercel';
+                }
+                if (toggleWhatsApp) {
+                    toggleWhatsApp.disabled = true;
+                    toggleWhatsApp.parentElement.style.opacity = '0.5';
+                    toggleWhatsApp.parentElement.title = 'WhatsApp não disponível na Vercel';
+                }
+                return;
+            }
             updateWhatsappUI(response.status);
         }
     } catch (error) {
@@ -408,6 +602,19 @@ function updateWhatsappUI(status) {
     if (whatsappTestBtn) whatsappTestBtn.classList.add('hidden');
 
     switch (status) {
+        case 'unavailable':
+            if (whatsappStatusText) {
+                whatsappStatusText.textContent = 'Status: Indisponível (Vercel)';
+                whatsappStatusText.style.color = '#fbbf24'; // amber
+            }
+            if (whatsappConnectBtn) {
+                whatsappConnectBtn.classList.remove('hidden');
+                whatsappConnectBtn.disabled = true;
+                whatsappConnectBtn.style.opacity = '0.5';
+                whatsappConnectBtn.style.cursor = 'not-allowed';
+            }
+            if (whatsappDisconnectBtn) whatsappDisconnectBtn.classList.add('hidden');
+            break;
         case 'connecting':
             if (whatsappStatusText) whatsappStatusText.textContent = 'Status: Conectando...';
             if (whatsappConnectBtn) whatsappConnectBtn.classList.add('hidden');
@@ -470,6 +677,9 @@ function showKanbanView() {
     updateToggleUI();
     loadInitialData();
     connectWebSocket();
+    
+    // Carrega status do WhatsApp Meta
+    loadWhatsAppMetaStatus();
 }
 
 function renderBoardSelectors(boards) {
@@ -760,7 +970,29 @@ whatsappConnectBtn.addEventListener('click', async () => {
         }
     } catch (error) {
         console.error('Erro ao solicitar conexão:', error);
-        showAlert(`Erro: ${error.message}`);
+        
+        // Detecta se é erro de Vercel e mostra mensagem específica
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('Vercel') || errorMsg.includes('serverless') || errorMsg.includes('Railway') || errorMsg.includes('Render')) {
+            showAlert(
+                'WhatsApp não está disponível na Vercel! 📱\n\n' +
+                'A Vercel é um ambiente serverless que não suporta conexões persistentes.\n\n' +
+                'Para usar notificações via WhatsApp, você precisa hospedar o backend em:\n' +
+                '• Railway.app (recomendado - grátis)\n' +
+                '• Render.com (grátis)\n' +
+                '• VPS próprio\n\n' +
+                'As notificações por EMAIL continuam funcionando! ✉️',
+                '⚠️ WhatsApp Indisponível'
+            );
+            if (whatsappStatusText) {
+                whatsappStatusText.textContent = 'Status: Não disponível (Vercel)';
+            }
+        } else {
+            showAlert(`Erro ao iniciar conexão: ${errorMsg}`);
+            if (whatsappStatusText) {
+                whatsappStatusText.textContent = 'Status: Erro ao conectar';
+            }
+        }
     }
 });
 whatsappDisconnectBtn.addEventListener('click', async () => {
@@ -810,7 +1042,31 @@ toggleWhatsApp.addEventListener('change', (e) => { const wantsWhatsApp = e.targe
 whatsappNumberInput.addEventListener('change', (e) => { const newNumber = e.target.value.trim(); if (currentUserSettings.whatsappNumber !== newNumber) { currentUserSettings.whatsappNumber = newNumber || null; updateUserSettings({ whatsappNumber: currentUserSettings.whatsappNumber }); } });
 userMenuButton.addEventListener('click', (e) => { e.stopPropagation(); const isVisible = userMenuDropdown.classList.toggle('dropdown-visible'); dropdownArrow.classList.toggle('arrow-rotated', isVisible); });
 document.addEventListener('click', (e) => { if (!userMenu.contains(e.target) && userMenuDropdown.classList.contains('dropdown-visible')) { userMenuDropdown.classList.remove('dropdown-visible'); dropdownArrow.classList.remove('arrow-rotated'); } });
-loginForm.addEventListener('submit', async (e) => { e.preventDefault(); loginError.classList.add('hidden'); const em = loginEmailInput.value; const pw = loginPasswordInput.value; try { await login(em, pw); showKanbanView(); } catch (err) { loginError.textContent = err.message || 'Erro login.'; loginError.classList.remove('hidden'); } });
+loginForm.addEventListener('submit', async (e) => { 
+    e.preventDefault(); 
+    loginError.classList.add('hidden'); 
+    const em = loginEmailInput.value.trim(); 
+    const pw = loginPasswordInput.value.trim(); 
+    
+    console.log('Login attempt:', { email: em, hasPassword: !!pw });
+    
+    if (!em || !pw) {
+        loginError.textContent = 'Preencha email e senha.';
+        loginError.classList.remove('hidden');
+        return;
+    }
+    
+    try { 
+        console.log('Calling login API...');
+        await login(em, pw); 
+        console.log('Login successful!');
+        showKanbanView(); 
+    } catch (err) { 
+        console.error('Login error:', err);
+        loginError.textContent = err.message || 'Erro login.'; 
+        loginError.classList.remove('hidden'); 
+    } 
+});
 signupForm.addEventListener('submit', async (e) => {
     e.preventDefault(); signupError.classList.add('hidden'); const name = signupNameInput.value.trim(); const email = signupEmailInput.value; const pw = signupPasswordInput.value; const cpw = signupConfirmPasswordInput.value;
     if (!name) { signupError.textContent = 'O nome é obrigatório.'; signupError.classList.remove('hidden'); return; }
@@ -825,6 +1081,24 @@ confirmModalConfirm.addEventListener('click', () => closeConfirmModal(true));
 infoModalClose.addEventListener('click', closeInfoModal);
 infoIcons.forEach(icon => { icon.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); const settingKey = e.target.closest('.info-icon').dataset.settingKey; let title = 'Informação'; let description = '...'; if (settingKey === 'dailySummary') { title = 'Resumo Diário'; description = 'Envia e-mail matinal com tarefas pendentes.'; } else if (settingKey === 'staleTasks') { title = 'Aviso de Tarefa Parada'; description = 'Envia e-mail se tarefa ficar em "Doing" por mais de 2 dias.'; } openInfoModal(title, description, currentUserEmail); }); });
 allToggles.forEach(toggle => { toggle.addEventListener('change', (e) => { const settingKey = e.target.dataset.setting; const value = e.target.checked; currentUserSettings[settingKey] = value; updateUserSettings({ [settingKey]: value }); }); });
+
+// WhatsApp Meta Event Listeners
+if (whatsappMetaTutorialBtn) {
+    whatsappMetaTutorialBtn.addEventListener('click', openWhatsAppMetaTutorial);
+}
+if (whatsappMetaTutorialClose) {
+    whatsappMetaTutorialClose.addEventListener('click', closeWhatsAppMetaTutorial);
+}
+if (whatsappMetaSaveBtn) {
+    whatsappMetaSaveBtn.addEventListener('click', saveWhatsAppMetaCredentials);
+}
+if (whatsappMetaRemoveBtn) {
+    whatsappMetaRemoveBtn.addEventListener('click', removeWhatsAppMetaCredentials);
+}
+if (whatsappMetaTestBtn) {
+    whatsappMetaTestBtn.addEventListener('click', sendWhatsAppMetaTest);
+}
+
 document.body.addEventListener('click', function (event) { if (event.target.matches('.add-task-button')) { if (!currentBoardId) { showAlert('Selecione ou crie um quadro.'); return; } openTaskModal(); const s = event.target.dataset.status || 'TODO'; taskStatusSelect.value = s; } });
 taskForm.addEventListener('submit', handleTaskFormSubmit);
 modalCancelButton.addEventListener('click', closeTaskModal);

@@ -25,6 +25,12 @@ model User {
   notifyDailySummary Boolean @default(true)
   notifyStaleTasks   Boolean @default(true)
 
+  // Meta WhatsApp Business API
+  whatsappMetaPhoneNumberId String?
+  whatsappMetaAccessToken   String?
+  whatsappMessagesThisMonth Int     @default(0)
+  whatsappMonthResetDate    DateTime?
+
   @@map("users")
 }
 
