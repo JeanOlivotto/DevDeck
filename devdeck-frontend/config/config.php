@@ -22,12 +22,15 @@ date_default_timezone_set('America/Sao_Paulo');
 // Detectar base path automaticamente
 $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
 $basePath = ($scriptPath === '/' || $scriptPath === '\\') ? '' : $scriptPath;
+// Remove /views do path se existir, pois os assets estão na raiz
+$basePath = str_replace('/views', '', $basePath);
 define('BASE_PATH', $basePath);
 
 // Função helper para criar URLs corretas
 function url($path) {
     $path = ltrim($path, '/');
-    return BASE_PATH . '/' . $path;
+    $base = BASE_PATH ? BASE_PATH . '/' : '/';
+    return $base . $path;
 }
 
 // Iniciar sessão

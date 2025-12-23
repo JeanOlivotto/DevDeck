@@ -1,9 +1,9 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 
-// Redirecionar para login se não estiver autenticado
-if (!isLoggedIn()) {
-    redirect('/index.php');
+// Redirecionar para dashboard se já estiver logado
+if (isLoggedIn()) {
+    redirect('/views/dashboard.php');
 }
 
 $pageTitle = 'DevDeck - Cadastro';
