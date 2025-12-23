@@ -43,6 +43,8 @@ $pageTitle = 'DevDeck - Cadastro';
     </div>
 </div>
 
+<?php include __DIR__ . '/../components/modals.php'; ?>
+
 <script src="<?php echo url('assets/js/auth.js'); ?>"></script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -5,6 +5,46 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginError = document.getElementById('login-error');
     const signupError = document.getElementById('signup-error');
     
+    // Função auxiliar para mostrar alerta de sucesso
+    window.showSignupSuccessAlert = function(title, message, onOkCallback) {
+        const alertModal = document.getElementById('alert-modal');
+        const alertModalTitle = document.getElementById('alert-modal-title');
+        const alertModalMessage = document.getElementById('alert-modal-message');
+        const alertModalOk = document.getElementById('alert-modal-ok');
+        
+        if (alertModal && alertModalTitle && alertModalMessage && alertModalOk) {
+            alertModalTitle.textContent = title;
+            alertModalMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+            
+            // Remove event listeners antigos para evitar duplicatas
+            const newOkButton = alertModalOk.cloneNode(true);
+            alertModalOk.parentNode.replaceChild(newOkButton, alertModalOk);
+            
+            newOkButton.addEventListener('click', function() {
+                alertModal.classList.add('hidden');
+                if (typeof onOkCallback === 'function') {
+                    onOkCallback();
+                }
+            });
+            
+            // Permitir fechar pressionando Enter
+            document.addEventListener('keydown', function handleEnter(e) {
+                if (e.key === 'Enter' && !alertModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    newOkButton.click();
+                    document.removeEventListener('keydown', handleEnter);
+                }
+            });
+        } else {
+            // Fallback se os elementos não existirem
+            alert(title + '\n\n' + message);
+            if (typeof onOkCallback === 'function') {
+                onOkCallback();
+            }
+        }
+    };
+    
     // Login
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
@@ -98,7 +138,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({ name, email, password })
                 }, false);
                 
+                console.log('Signup response:', data); // DEBUG
+                
                 if (data?.access_token) {
+                    // Cadastro automático com login
+                    console.log('Received access token, setting auth...');
                     DevDeck.setAuthToken(data.access_token);
                     
                     if (data.user) {
@@ -116,14 +160,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         })
                     }).catch(e => console.warn('Session sync warning:', e));
                     
-                    // Redirecionar para dashboard
-                    window.location.href = BASE_PATH + '/views/dashboard.php';
+                    // Mostrar alerta de sucesso e redirecionar para dashboard
+                    showSignupSuccessAlert('Bem-vindo!', 'Cadastro realizado com sucesso! Redirecionando...', () => {
+                        window.location.href = BASE_PATH + '/views/dashboard.php';
+                    });
                 } else if (data?.message) {
-                    // Sucesso, mas precisa fazer login
-                    DevDeck.showAlert('Cadastro realizado com sucesso! Faça login para continuar.', 'Sucesso');
-                    setTimeout(() => {
+                    // Cadastro realizado, mas precisa fazer login na próxima vez
+                    console.log('Signup successful, but requires login');
+                    showSignupSuccessAlert('Cadastro Realizado!', 'Sua conta foi criada com sucesso! Redirecionando para login...', () => {
                         window.location.href = BASE_PATH + '/index.php';
-                    }, 2000);
+                    });
+                } else {
+                    throw new Error('Resposta inesperada do servidor');
                 }
             } catch (error) {
                 console.error('Erro no cadastro:', error);
