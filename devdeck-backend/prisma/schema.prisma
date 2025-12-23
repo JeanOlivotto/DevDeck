@@ -1,50 +1,43 @@
-// schema.prisma
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// --- NOVO MODELO USER ---
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
 model User {
-  id                Int      @id @default(autoincrement())
-  email             String   @unique
-  name              String
-  password          String
-  boards            Board[]
-  whatsappNumber    String? 
-  notifyViaWhatsApp Boolean  @default(false)
-  whatsappSession   String? 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  notifyDailySummary Boolean @default(true)
-  notifyStaleTasks   Boolean @default(true)
-
-  // Meta WhatsApp Business API
+  id                        Int       @id @default(autoincrement())
+  email                     String    @unique
+  name                      String
+  password                  String
+  whatsappNumber            String?
+  notifyViaWhatsApp         Boolean   @default(false)
+  whatsappSession           String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  notifyDailySummary        Boolean   @default(true)
+  notifyStaleTasks          Boolean   @default(true)
   whatsappMetaPhoneNumberId String?
   whatsappMetaAccessToken   String?
-  whatsappMessagesThisMonth Int     @default(0)
+  whatsappMessagesThisMonth Int       @default(0)
   whatsappMonthResetDate    DateTime?
+  boards                    Board[]
 
   @@map("users")
 }
 
 model Board {
   id     Int    @id @default(autoincrement())
-  name   String // Nome não precisa mais ser globalmente único, apenas por usuário
-  order  Int    @default(0) // Ordem de exibição dos quadros
+  name   String
+  order  Int    @default(0)
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks  Task[]
-  // --- ADICIONAR RELAÇÃO COM USER ---
-  userId Int // Chave estrangeira
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade) // Deletar quadros se o user for deletado
 
-  // Adiciona índice único para nome E userId, permitindo nomes iguais para usuários diferentes
   @@unique([name, userId])
+  @@index([userId], map: "boards_userId_fkey")
   @@map("boards")
 }
 
@@ -52,11 +45,12 @@ model Task {
   id          Int      @id @default(autoincrement())
   title       String
   description String?
-  status      String   @default("TODO") // TODO, DOING, DONE
+  status      String   @default("TODO")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   boardId     Int
   board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
 
+  @@index([boardId], map: "tasks_boardId_fkey")
   @@map("tasks")
 }

@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Redirecionar para dashboard
-                    window.location.href = '/views/dashboard.php';
+                    window.location.href = BASE_PATH + '/views/dashboard.php';
                 } else {
                     throw new Error('Token de autenticação não recebido');
                 }
@@ -86,12 +86,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Redirecionar para dashboard
-                    window.location.href = '/views/dashboard.php';
+                    window.location.href = BASE_PATH + '/views/dashboard.php';
                 } else if (data?.message) {
                     // Sucesso, mas precisa fazer login
                     DevDeck.showAlert('Cadastro realizado com sucesso! Faça login para continuar.', 'Sucesso');
                     setTimeout(() => {
-                        window.location.href = '/index.php';
+                        window.location.href = BASE_PATH + '/index.php';
                     }, 2000);
                 }
             } catch (error) {
