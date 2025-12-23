@@ -14,7 +14,9 @@ import {
   Patch,
   Delete,
   UseGuards,
-  Req, // Mantido
+  Req,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { BoardService } from './board.service';
 import {
@@ -38,10 +40,18 @@ export class BoardController {
   }
 
   @Get()
-  findAll(@Req() req) {
+  findAll(@Req() req, @Query('groupId') groupId?: string) {
     const userId = req.user.userId;
-    // CORREÇÃO: Passar userId
-    return this.boardService.findAll(userId); // <--- CORRIGIDO
+    let groupIdNum: number | undefined = undefined;
+
+    if (groupId !== undefined) {
+      groupIdNum = parseInt(groupId, 10);
+      if (isNaN(groupIdNum)) {
+        throw new BadRequestException('groupId deve ser um número válido');
+      }
+    }
+
+    return this.boardService.findAll(userId, groupIdNum);
   }
 
   @Patch('reorder')

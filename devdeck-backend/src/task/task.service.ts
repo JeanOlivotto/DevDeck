@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   NotFoundException,
@@ -34,44 +30,74 @@ export class TaskService {
     }
   }
 
-  // Modificado para receber userId e filtrar por ele ou por boardId (do usuário)
+  // Modificado para receber userId e filtrar por ele (personal) ou grupos
   async findAll(userId: number, boardId?: number) {
     const whereCondition: Prisma.TaskWhereInput = {};
 
     if (boardId) {
-      // Garante que o boardId pertence ao usuário antes de filtrar as tasks
+      // Garante que o boardId existe e pertence ao usuário ou grupo
       await this.findBoardOrFailForUser(boardId, userId);
       whereCondition.boardId = boardId;
     } else {
-      // Se nenhum boardId específico foi pedido, busca tarefas de TODOS os quadros do usuário
+      // Busca tarefas de todos os boards acessíveis (personal + grupos)
       whereCondition.board = {
-        userId: userId,
+        OR: [
+          { userId: userId }, // Boards pessoais
+          {
+            // Boards de grupos onde user é membro
+            group: {
+              members: {
+                some: {
+                  userId: userId,
+                  inviteStatus: 'accepted',
+                },
+              },
+            },
+          },
+        ],
       };
     }
 
     return await this.prisma.task.findMany({
       where: whereCondition,
-      include: { board: true }, // Inclui board para contexto, mesmo filtrando por board.userId
+      include: { board: true },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  // Modificado para receber userId e verificar pertencimento da tarefa (via quadro)
+  // Modificado para receber userId e verificar pertencimento (personal ou grupo)
   async findOne(id: number, userId: number) {
     const task = await this.prisma.task.findUnique({
       where: { id },
-      include: { board: true }, // Inclui o board para verificar o userId
+      include: {
+        board: {
+          include: { group: { include: { members: true } } },
+        },
+      },
     });
 
     if (!task) {
       throw new NotFoundException(`Tarefa com ID ${id} não encontrada.`);
     }
-    // Verifica se o quadro da tarefa pertence ao usuário logado
-    if (task.board.userId !== userId) {
-      throw new ForbiddenException(
-        'Você não tem permissão para acessar esta tarefa.',
+
+    // Verificar acesso
+    if (task.board.type === 'personal') {
+      if (task.board.userId !== userId) {
+        throw new ForbiddenException(
+          'Você não tem permissão para acessar esta tarefa.',
+        );
+      }
+    } else if (task.board.type === 'group') {
+      const isMember = task.board.group?.members.some(
+        (m) => m.userId === userId && m.inviteStatus === 'accepted',
       );
+      if (!isMember) {
+        throw new ForbiddenException(
+          'Você não é membro do grupo desta tarefa.',
+        );
+      }
     }
+
     return task;
   }
 
@@ -124,22 +150,37 @@ export class TaskService {
     }
   }
 
-  // Função auxiliar modificada para verificar board E pertencimento ao usuário
+  // Função auxiliar para verificar board E pertencimento (personal ou grupo)
   private async findBoardOrFailForUser(boardId: number, userId: number) {
     const board = await this.prisma.board.findUnique({
       where: { id: boardId },
+      include: {
+        group: { include: { members: true } },
+      },
     });
+
     if (!board) {
       throw new NotFoundException(`Quadro com ID ${boardId} não encontrado.`);
     }
-    if (board.userId !== userId) {
-      throw new ForbiddenException(
-        `Quadro com ID ${boardId} não pertence a você.`,
-      );
-    }
-    return board; // Retorna o quadro se encontrado e pertencer ao usuário
-  }
 
-  // Remover a função findBoardOrFail antiga se não for mais usada em outro lugar
-  // private async findBoardOrFail(boardId: number) { ... }
+    // Verificar acesso
+    if (board.type === 'personal') {
+      if (board.userId !== userId) {
+        throw new ForbiddenException(
+          `Quadro pessoal com ID ${boardId} não pertence a você.`,
+        );
+      }
+    } else if (board.type === 'group') {
+      const isMember = board.group?.members.some(
+        (m) => m.userId === userId && m.inviteStatus === 'accepted',
+      );
+      if (!isMember) {
+        throw new ForbiddenException(
+          'Você não é membro do grupo deste quadro.',
+        );
+      }
+    }
+
+    return board;
+  }
 }

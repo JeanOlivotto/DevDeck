@@ -110,7 +110,7 @@
       "name": "Boards",
       "item": [
         {
-          "name": "Create Board",
+          "name": "Create Board (Personal)",
           "request": {
             "method": "POST",
             "header": [
@@ -118,7 +118,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Meu board\"\n}"
+              "raw": "{\n  \"name\": \"Meu board pessoal\",\n  \"type\": \"personal\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/boards",
@@ -128,13 +128,45 @@
           }
         },
         {
-          "name": "List Boards",
+          "name": "Create Board (Group)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Board do grupo\",\n  \"type\": \"group\",\n  \"groupId\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/boards",
+              "host": ["{{base_url}}"],
+              "path": ["boards"]
+            }
+          }
+        },
+        {
+          "name": "List Boards (Todos)",
           "request": {
             "method": "GET",
             "url": {
               "raw": "{{base_url}}/boards",
               "host": ["{{base_url}}"],
               "path": ["boards"]
+            }
+          }
+        },
+        {
+          "name": "List Boards (Por Grupo)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/boards?groupId=1",
+              "host": ["{{base_url}}"],
+              "path": ["boards"],
+              "query": [
+                { "key": "groupId", "value": "1", "description": "ID do grupo" }
+              ]
             }
           }
         },
@@ -201,6 +233,178 @@
               "path": ["boards", ":id"],
               "variable": [
                 { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "Create Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Meu Grupo\",\n  \"description\": \"Descrição do grupo\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/groups",
+              "host": ["{{base_url}}"],
+              "path": ["groups"]
+            }
+          }
+        },
+        {
+          "name": "List Groups",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/groups",
+              "host": ["{{base_url}}"],
+              "path": ["groups"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Invites",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/groups/invites/pending",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "invites", "pending"]
+            }
+          }
+        },
+        {
+          "name": "Get Group Details",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/groups/:id",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Novo Nome\",\n  \"description\": \"Nova descrição\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/groups/:id",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Group",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/groups/:id",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invite Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"role\": \"member\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/groups/:id/invite",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id", "invite"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Accept Invite",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/groups/:id/accept-invite",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id", "accept-invite"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reject Invite",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/groups/:id/reject-invite",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id", "reject-invite"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Group Members",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/groups/:id/members",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id", "members"],
+              "variable": [
+                { "key": "id", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Remove Member",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/groups/:id/members/:memberId",
+              "host": ["{{base_url}}"],
+              "path": ["groups", ":id", "members", ":memberId"],
+              "variable": [
+                { "key": "id", "value": "1" },
+                { "key": "memberId", "value": "2" }
               ]
             }
           }

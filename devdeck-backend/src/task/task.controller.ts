@@ -12,8 +12,7 @@ import {
   HttpStatus,
   Query,
   UseGuards,
-  Req, // Mantido
-  BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';

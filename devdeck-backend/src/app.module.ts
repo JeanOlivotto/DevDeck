@@ -19,6 +19,7 @@ import { EncryptionService } from './encryption/encryption.service';
 import { WhatsappService } from './whatsapp/whatsapp.service';
 import { PusherAuthController } from './pusher-auth/pusher-auth.controller';
 import { ScheduleModule } from '@nestjs/schedule';
+import { GroupModule } from './group/group.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     NotificationModule,
     WhatsappModule,
     EncryptionModule,
+    GroupModule,
   ],
   controllers: [AuthController, UserController, PusherAuthController],
   providers: [

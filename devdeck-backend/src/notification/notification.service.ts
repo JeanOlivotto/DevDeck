@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
@@ -89,19 +87,24 @@ export class NotificationService {
     const notificationsByUser = new Map<
       number,
       {
-        user: (typeof tasksToNotify)[0]['board']['user'];
+        user: NonNullable<(typeof tasksToNotify)[0]['board']['user']>;
         tasks: typeof tasksToNotify;
       }
     >();
     for (const task of tasksToNotify) {
       const userId = task.board.userId;
-      if (!notificationsByUser.has(userId)) {
-        notificationsByUser.set(userId, { user: task.board.user, tasks: [] });
+      if (userId && !notificationsByUser.has(userId)) {
+        if (task.board.user) {
+          notificationsByUser.set(userId, { user: task.board.user, tasks: [] });
+        }
       }
-      notificationsByUser.get(userId)!.tasks.push(task);
+      if (userId) {
+        notificationsByUser.get(userId)!.tasks.push(task);
+      }
     }
 
     for (const [, { user, tasks }] of notificationsByUser) {
+      if (!user) continue;
       let messageText = `Atenção, ${user.name}!\n\nAs seguintes tarefas estão em "Doing" há mais de 2 dias:\n\n`;
       tasks.forEach((task) => {
         messageText += `• [${task.board.name}] ${task.title}\n`;

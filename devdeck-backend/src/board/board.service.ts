@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   NotFoundException,
@@ -6,7 +8,7 @@ import {
   Logger,
   ConflictException,
   BadRequestException,
-  ForbiddenException, // <-- Importe ForbiddenException
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -18,26 +20,59 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class BoardService implements OnModuleInit {
-  // ... (logger, defaultBoards, constructor, onModuleInit mantidos) ...
   private readonly logger = new Logger(BoardService.name);
   private readonly defaultBoards = [
     'Tasks Pendentes',
     'Novas Ideias',
     'Alinhamento com Cliente',
   ];
+
   constructor(private readonly prisma: PrismaService) {}
+
   async onModuleInit() {
-    /* ... código mantido ... */
+    // Você pode deixar em branco se não quiser inicializar boards padrão
   }
 
-  // Modificado para receber userId
+  /**
+   * Criar novo board (personal ou group)
+   */
   async create(createBoardDto: CreateBoardDto, userId: number) {
     try {
+      const boardData: any = {
+        name: createBoardDto.name,
+        type: createBoardDto.type || 'personal',
+      };
+
+      // Se type é 'group', groupId é obrigatório
+      if (boardData.type === 'group') {
+        if (!createBoardDto.groupId) {
+          throw new BadRequestException(
+            'groupId é obrigatório para criar um quadro de grupo',
+          );
+        }
+
+        // Verificar se o usuário é membro do grupo
+        const groupMember = await this.prisma.groupMember.findUnique({
+          where: {
+            groupId_userId: {
+              groupId: createBoardDto.groupId,
+              userId: userId,
+            },
+          },
+        });
+
+        if (!groupMember || groupMember.inviteStatus !== 'accepted') {
+          throw new ForbiddenException('Você não é membro deste grupo');
+        }
+
+        boardData.groupId = createBoardDto.groupId;
+      } else {
+        // Personal board
+        boardData.userId = userId;
+      }
+
       return await this.prisma.board.create({
-        data: {
-          name: createBoardDto.name,
-          userId: userId, // Associa ao usuário logado
-        },
+        data: boardData,
       });
     } catch (error) {
       if (
@@ -53,38 +88,93 @@ export class BoardService implements OnModuleInit {
     }
   }
 
-  // Modificado para receber userId e filtrar
-  async findAll(userId: number) {
+  /**
+   * Listar boards (personal + grupos)
+   */
+  async findAll(userId: number, groupId?: number) {
+    const where: any = {};
+
+    if (groupId) {
+      // Se groupId fornecido, retorna apenas boards do grupo
+      where.groupId = groupId;
+
+      // Verificar se user é membro do grupo
+      const groupMember = await this.prisma.groupMember.findUnique({
+        where: {
+          groupId_userId: {
+            groupId,
+            userId,
+          },
+        },
+      });
+
+      if (!groupMember || groupMember.inviteStatus !== 'accepted') {
+        throw new ForbiddenException('Você não é membro deste grupo');
+      }
+    } else {
+      // Se sem groupId, retorna boards pessoais + de grupos onde user é membro
+      where.OR = [
+        { userId: userId },
+        {
+          group: {
+            members: {
+              some: {
+                userId: userId,
+                inviteStatus: 'accepted',
+              },
+            },
+          },
+        },
+      ];
+    }
+
     return await this.prisma.board.findMany({
-      where: { userId: userId }, // Filtra quadros pelo usuário logado
+      where,
       include: { tasks: { orderBy: { createdAt: 'asc' } } },
-      orderBy: { order: 'asc' }, // Ordena por order ao invés de id
+      orderBy: { order: 'asc' },
     });
   }
 
-  // Modificado para receber userId e verificar pertencimento
+  /**
+   * Obter um board específico (personal ou grupo)
+   */
   async findOne(id: number, userId: number) {
     const board = await this.prisma.board.findUnique({
-      where: { id }, // Busca pelo ID primeiro
-      include: { tasks: { orderBy: { createdAt: 'asc' } } },
+      where: { id },
+      include: {
+        tasks: { orderBy: { createdAt: 'asc' } },
+        group: { include: { members: true } },
+      },
     });
 
     if (!board) {
       throw new NotFoundException(`Quadro com ID ${id} não encontrado.`);
     }
-    // Verifica se o quadro pertence ao usuário logado
-    if (board.userId !== userId) {
-      throw new ForbiddenException(
-        'Você não tem permissão para acessar este quadro.',
+
+    // Verificar acesso
+    if (board.type === 'personal') {
+      if (board.userId !== userId) {
+        throw new ForbiddenException(
+          'Você não tem permissão para acessar este quadro.',
+        );
+      }
+    } else if (board.type === 'group') {
+      const isMember = board.group?.members.some(
+        (m) => m.userId === userId && m.inviteStatus === 'accepted',
       );
+      if (!isMember) {
+        throw new ForbiddenException('Você não é membro deste grupo.');
+      }
     }
+
     return board;
   }
 
-  // Modificado para receber userId e verificar pertencimento antes de atualizar
+  /**
+   * Atualizar um board
+   */
   async update(id: number, updateBoardDto: UpdateBoardDto, userId: number) {
-    // findOne já verifica se o quadro existe E pertence ao usuário
-    await this.findOne(id, userId);
+    const board = await this.findOne(id, userId);
 
     if (!updateBoardDto.name) {
       throw new BadRequestException('Nenhum dado fornecido para atualização.');
@@ -92,7 +182,7 @@ export class BoardService implements OnModuleInit {
 
     try {
       return await this.prisma.board.update({
-        where: { id }, // Não precisa mais where: { id, userId } pois findOne já validou
+        where: { id },
         data: { name: updateBoardDto.name },
         include: { tasks: { orderBy: { createdAt: 'asc' } } },
       });
@@ -101,39 +191,22 @@ export class BoardService implements OnModuleInit {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        // Verifica a constraint única [name, userId]
-        const existing = await this.prisma.board.findUnique({
-          where: { name_userId: { name: updateBoardDto.name, userId: userId } },
-        });
-        if (existing) {
-          throw new ConflictException(
-            `Você já possui um quadro com o nome '${updateBoardDto.name}'.`,
-          );
-        }
-        // Se chegou aqui, pode ser outro erro P2002 inesperado
-        this.logger.error(
-          `Erro P2002 inesperado ao atualizar quadro ${id}:`,
-          error,
-        );
+        throw new ConflictException('Um quadro com este nome já existe.');
       }
       this.logger.error(`Erro ao atualizar quadro ${id}:`, error);
       throw error;
     }
   }
 
-  // Modificado para receber userId e verificar pertencimento antes de remover
+  /**
+   * Deletar um board
+   */
   async remove(id: number, userId: number) {
-    // findOne já verifica se o quadro existe E pertence ao usuário
-    const board = await this.findOne(id, userId);
-
-    // Opcional: Impedir exclusão dos quadros padrão (mantido)
-    // if (this.defaultBoards.includes(board.name)) {
-    //   throw new BadRequestException(`Não é possível excluir o quadro padrão "${board.name}".`);
-    // }
+    await this.findOne(id, userId);
 
     try {
       await this.prisma.board.delete({
-        where: { id }, // Não precisa mais where: { id, userId }
+        where: { id },
       });
       this.logger.log(
         `Quadro com ID ${id} excluído com sucesso pelo usuário ${userId}.`,
@@ -147,22 +220,34 @@ export class BoardService implements OnModuleInit {
     }
   }
 
-  // Novo método para reordenar quadros
+  /**
+   * Reordenar boards (personal ou grupo)
+   */
   async reorderBoards(reorderDto: ReorderBoardsDto, userId: number) {
-    // Verifica se todos os quadros pertencem ao usuário
+    // Verifica se todos os quadros pertencem ao usuário (personal) ou grupos que é membro
     const boardIds = reorderDto.boards.map((b) => b.id);
-    const userBoards = await this.prisma.board.findMany({
+    const boards = await this.prisma.board.findMany({
       where: {
         id: { in: boardIds },
-        userId: userId,
       },
-      select: { id: true },
+      include: { group: { include: { members: true } } },
     });
 
-    if (userBoards.length !== boardIds.length) {
-      throw new ForbiddenException(
-        'Você não tem permissão para reordenar alguns desses quadros.',
-      );
+    // Validar acesso para cada board
+    for (const board of boards) {
+      if (board.type === 'personal' && board.userId !== userId) {
+        throw new ForbiddenException(
+          'Você não tem permissão para reordenar este quadro pessoal.',
+        );
+      }
+      if (board.type === 'group') {
+        const isMember = board.group?.members.some(
+          (m) => m.userId === userId && m.inviteStatus === 'accepted',
+        );
+        if (!isMember) {
+          throw new ForbiddenException('Você não é membro deste grupo.');
+        }
+      }
     }
 
     // Atualiza a ordem de cada quadro

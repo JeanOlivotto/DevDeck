@@ -7,6 +7,7 @@ import {
   IsArray,
   IsInt,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -15,12 +16,23 @@ export class CreateBoardDto {
   @IsNotEmpty({ message: 'O nome não pode estar vazio.' })
   @MaxLength(100, { message: 'O nome não pode ter mais que 100 caracteres.' })
   name: string;
+
+  @IsOptional()
+  @IsIn(['personal', 'group'], {
+    message: 'O tipo deve ser "personal" ou "group".',
+  })
+  type?: string;
+
+  @IsOptional()
+  @IsInt({ message: 'O ID do grupo deve ser um número inteiro.' })
+  groupId?: number;
 }
+
 export class UpdateBoardDto {
   @IsString({ message: 'O nome deve ser uma string.' })
   @IsNotEmpty({ message: 'O nome não pode estar vazio.' })
   @MaxLength(100, { message: 'O nome não pode ter mais que 100 caracteres.' })
-  @IsOptional() // Torna opcional, mas se enviado, deve ser válido
+  @IsOptional()
   name?: string;
 }
 
@@ -38,7 +50,3 @@ export class ReorderBoardsDto {
   @Type(() => BoardOrderDto)
   boards: BoardOrderDto[];
 }
-
-// Para Update, podemos usar PartialType ou criar um DTO específico se necessário
-// import { PartialType } from '@nestjs/mapped-types';
-// export class UpdateBoardDto extends PartialType(CreateBoardDto) {}

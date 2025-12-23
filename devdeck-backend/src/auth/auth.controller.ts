@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 // src/auth/auth.controller.ts
 import {
   Controller,
