@@ -220,22 +220,37 @@ async function handleGroupFormSubmit(e) {
         
         if (groupModalState.isEditing && groupModalState.currentGroupId) {
             // Editar grupo
-            await updateGroup(groupModalState.currentGroupId, name, description);
+            const updatedGroup = await updateGroup(groupModalState.currentGroupId, name, description);
+            
+            // Atualizar grupo na sidebar SEM RECARREGAR TUDO
+            const groupElement = document.querySelector(`.group-header-item[data-group-id="${groupModalState.currentGroupId}"]`)?.closest('.group-item');
+            if (groupElement) {
+                const nameSpan = groupElement.querySelector('h4');
+                if (nameSpan) {
+                    nameSpan.textContent = name;
+                }
+            }
+            
             DevDeck.showAlert('Grupo atualizado com sucesso!', 'Sucesso');
         } else {
             // Criar novo grupo
-            await createGroup(name, description);
+            const newGroup = await createGroup(name, description);
+            
+            // Recarregar grupos e re-renderizar TUDO (sidebar, navbar)
+            await loadGroups();
+            
+            // Garantir que as funções existem antes de chamar
+            if (typeof renderGroupsSidebar === 'function') {
+                renderGroupsSidebar();
+            }
+            if (typeof renderGroupsListDropdown === 'function') {
+                renderGroupsListDropdown();
+            }
+            
             DevDeck.showAlert('Grupo criado com sucesso!', 'Sucesso');
         }
         
-        // Recarregar grupos
-        await loadGroups();
         closeGroupModal();
-        
-        // Se tem uma função para renderizar grupos, chamar
-        if (typeof renderGroupsList === 'function') {
-            renderGroupsList();
-        }
     } catch (error) {
         console.error('Erro ao salvar grupo:', error);
         DevDeck.showAlert(error.message || 'Erro ao salvar grupo', 'Erro');
@@ -263,17 +278,22 @@ async function handleGroupDelete(e) {
     try {
         DevDeck.showLoading();
         
-        await deleteGroup(groupModalState.currentGroupId);
-        DevDeck.showAlert('Grupo deletado com sucesso!', 'Sucesso');
+        const groupId = groupModalState.currentGroupId;
+        await deleteGroup(groupId);
         
-        // Recarregar grupos
+        // Recarregar grupos e re-renderizar TUDO (sidebar, navbar)
         await loadGroups();
-        closeGroupModal();
         
-        // Se tem uma função para renderizar grupos, chamar
-        if (typeof renderGroupsList === 'function') {
-            renderGroupsList();
+        // Garantir que as funções existem antes de chamar
+        if (typeof renderGroupsSidebar === 'function') {
+            renderGroupsSidebar();
         }
+        if (typeof renderGroupsListDropdown === 'function') {
+            renderGroupsListDropdown();
+        }
+        
+        DevDeck.showAlert('Grupo deletado com sucesso!', 'Sucesso');
+        closeGroupModal();
     } catch (error) {
         console.error('Erro ao deletar grupo:', error);
         DevDeck.showAlert(error.message || 'Erro ao deletar grupo', 'Erro');

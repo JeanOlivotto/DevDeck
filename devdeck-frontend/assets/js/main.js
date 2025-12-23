@@ -2,6 +2,7 @@
 const TOKEN_KEY = 'devdeck_auth_token';
 const USER_EMAIL_KEY = 'devdeck_user_email';
 const USER_NAME_KEY = 'devdeck_user_name';
+const USER_ID_KEY = 'devdeck_user_id';
 
 // Funções auxiliares
 function getAuthToken() {
@@ -18,19 +19,25 @@ function clearAuthData() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_EMAIL_KEY);
     localStorage.removeItem(USER_NAME_KEY);
+    localStorage.removeItem(USER_ID_KEY);
 }
 
-function setUserData(email, name) {
-    console.log('setUserData called:', email, name); // DEBUG
+function setUserData(email, name, userId = null) {
+    console.log('setUserData called:', email, name, userId); // DEBUG
     localStorage.setItem(USER_EMAIL_KEY, email);
     localStorage.setItem(USER_NAME_KEY, name);
+    if (userId) {
+        localStorage.setItem(USER_ID_KEY, userId.toString());
+    }
     console.log('User data saved'); // DEBUG
 }
 
 function getUserData() {
+    const id = parseInt(localStorage.getItem(USER_ID_KEY) || '0');
     return {
         email: localStorage.getItem(USER_EMAIL_KEY),
-        name: localStorage.getItem(USER_NAME_KEY)
+        name: localStorage.getItem(USER_NAME_KEY),
+        id: id > 0 ? id : null  // Retorna null se ID for inválido
     };
 }
 
@@ -161,16 +168,98 @@ async function fetchApi(endpoint, options = {}, requireAuth = true) {
     }
 }
 
+// Função para fazer requisições à API SEM mostrar loading (para requisições em background)
+async function fetchApiSilent(endpoint, options = {}, requireAuth = true) {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
+    
+    if (requireAuth) {
+        const token = getAuthToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            headers
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401 && requireAuth) {
+                // Limpar sessão PHP também
+                fetch(BASE_PATH + '/api/logout.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=logout'
+                }).catch(() => {});
+                
+                clearAuthData();
+                window.location.href = BASE_PATH + '/index.php';
+                throw new Error('Sessão inválida. Faça login novamente.');
+            }
+            
+            const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            let msg = 'Erro desconhecido';
+            
+            if (errorData && typeof errorData === 'object') {
+                msg = Array.isArray(errorData.message) 
+                    ? errorData.message.join(', ') 
+                    : errorData.message || errorData.error || msg;
+            } else if (typeof errorData === 'string') {
+                msg = errorData;
+            }
+            
+            throw new Error(msg || `Erro na API: ${response.statusText}`);
+        }
+        
+        return response.status === 204 ? null : await response.json();
+    } catch (error) {
+        console.error('Erro API:', error);
+        // Não mostrar alerta em requisições silent
+        throw error;
+    }
+}
+
 // Exportar para uso global
-window.DevDeck = {
-    getAuthToken,
-    setAuthToken,
-    clearAuthData,
-    setUserData,
-    getUserData,
-    showLoading,
-    hideLoading,
-    showAlert,
-    showConfirm,
-    fetchApi
-};
+try {
+    window.DevDeck = {
+        getAuthToken,
+        setAuthToken,
+        clearAuthData,
+        setUserData,
+        getUserData,
+        showLoading,
+        hideLoading,
+        showAlert,
+        showConfirm,
+        fetchApi,
+        fetchApiSilent
+    };
+
+    // DEBUG: Verificar se DevDeck foi criado com sucesso
+    console.log('DevDeck loaded:', {
+        hasDevDeck: typeof window.DevDeck !== 'undefined',
+        hasFetchApi: typeof window.DevDeck?.fetchApi,
+        hasFetchApiSilent: typeof window.DevDeck?.fetchApiSilent
+    });
+} catch (e) {
+    console.error('Erro ao criar DevDeck:', e);
+    // Fallback: criar DevDeck com apenas fetchApi se fetchApiSilent falhar
+    window.DevDeck = {
+        getAuthToken,
+        setAuthToken,
+        clearAuthData,
+        setUserData,
+        getUserData,
+        showLoading,
+        hideLoading,
+        showAlert,
+        showConfirm,
+        fetchApi,
+        fetchApiSilent: fetchApi // Usar fetchApi como fallback
+    };
+}

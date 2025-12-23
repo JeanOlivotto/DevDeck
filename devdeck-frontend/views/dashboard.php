@@ -79,6 +79,7 @@ $pageTitle = 'DevDeck - Dashboard';
 
 <?php include __DIR__ . '/../components/modals.php'; ?>
 
+<script src="<?php echo url('assets/js/component-updates.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban-modals.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban-settings.js'); ?>"></script>
@@ -86,5 +87,6 @@ $pageTitle = 'DevDeck - Dashboard';
 <script src="<?php echo url('assets/js/groups.js'); ?>"></script>
 <script src="<?php echo url('assets/js/group-modals.js'); ?>"></script>
 <script src="<?php echo url('assets/js/groups-sidebar.js'); ?>"></script>
+<script src="<?php echo url('assets/js/groups-navbar.js'); ?>"></script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

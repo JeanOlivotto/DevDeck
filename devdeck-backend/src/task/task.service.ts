@@ -22,7 +22,10 @@ export class TaskService {
     try {
       return await this.prisma.task.create({
         data: createTaskDto, // boardId já está no DTO
-        include: { board: true },
+        include: { 
+          board: true,
+          assignedUser: { select: { id: true, name: true, email: true } }
+        },
       });
     } catch (error) {
       this.logger.error('Erro ao criar tarefa:', error);
@@ -60,7 +63,10 @@ export class TaskService {
 
     return await this.prisma.task.findMany({
       where: whereCondition,
-      include: { board: true },
+      include: { 
+        board: true,
+        assignedUser: { select: { id: true, name: true, email: true } }
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -73,6 +79,7 @@ export class TaskService {
         board: {
           include: { group: { include: { members: true } } },
         },
+        assignedUser: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -114,11 +121,29 @@ export class TaskService {
       await this.findBoardOrFailForUser(updateTaskDto.boardId, userId);
     }
 
+    // Auto-atribuição: Se o status muda para "DOING", atribui o usuário atual
+    const dataToUpdate: any = { ...updateTaskDto };
+    if (updateTaskDto.status === 'DOING' && !updateTaskDto.assignedUserId) {
+      dataToUpdate.assignedUserId = userId;
+    }
+    // Se o status muda PARA ou DE "DOING" sem especificar assignedUserId, limpa a atribuição
+    else if (
+      updateTaskDto.status &&
+      updateTaskDto.status !== 'DOING' &&
+      !updateTaskDto.assignedUserId
+    ) {
+      // Usar null para limpar a atribuição no Prisma
+      dataToUpdate.assignedUserId = null;
+    }
+
     try {
       return await this.prisma.task.update({
         where: { id }, // Não precisa mais where: { id, board: { userId } }
-        data: updateTaskDto,
-        include: { board: true },
+        data: dataToUpdate,
+        include: { 
+          board: true,
+          assignedUser: { select: { id: true, name: true, email: true } }
+        },
       });
     } catch (error) {
       this.logger.error(

@@ -8,15 +8,56 @@ function renderGroupsSidebar() {
     
     if (!sidebarList) return;
     
-    // Se não há grupos, esconder sidebar
+    // Sempre mostrar a sidebar (para que o usuário possa criar o primeiro grupo)
+    sidebar.classList.remove('hidden');
+    
+    // Limpar sidebar
+    sidebarList.innerHTML = '';
+    
+    // Adicionar botão "Meu Kanban Pessoal" no topo
+    const personalKanbanBtn = document.createElement('div');
+    personalKanbanBtn.className = 'mb-4';
+    personalKanbanBtn.innerHTML = `
+        <button id="personal-kanban-btn" class="personal-kanban w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-cyan-500/50 font-semibold active">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5 3a2 2 0 012-2h6a2 2 0 012 2v2a2 2 0 01-2 2H7a2 2 0 01-2-2V3zM4 9a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V9z" />
+            </svg>
+            Meu Kanban Pessoal
+        </button>
+    `;
+    sidebarList.appendChild(personalKanbanBtn);
+    
+    // Adicionar listener ao botão pessoal
+    document.getElementById('personal-kanban-btn')?.addEventListener('click', async function() {
+        // Limpar filtros
+        currentGroupId = null;
+        
+        // Remover active de todos os grupos e botão pessoal
+        document.querySelectorAll('.group-header-item, .personal-kanban').forEach(el => {
+            el.classList.remove('active-group', 'active');
+        });
+        this.classList.add('active');
+        
+        // Recarregar apenas quadros pessoais
+        await loadPersonalBoards();
+    });
+    
+    // Se não há grupos, mostrar mensagem vazia
     if (!allGroups || allGroups.length === 0) {
-        sidebar.classList.add('hidden');
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'flex items-center justify-center py-8 h-full';
+        emptyMessage.innerHTML = `
+            <div class="text-center">
+                <svg class="w-12 h-12 text-gray-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <p class="text-sm text-gray-500">Nenhum grupo criado</p>
+                <p class="text-xs text-gray-600 mt-2">Clique em "Criar Novo Grupo" para começar!</p>
+            </div>
+        `;
+        sidebarList.appendChild(emptyMessage);
         return;
     }
-    
-    // Mostrar sidebar
-    sidebar.classList.remove('hidden');
-    sidebarList.innerHTML = '';
     
     allGroups.forEach((group, index) => {
         const groupElement = document.createElement('div');
@@ -34,7 +75,7 @@ function renderGroupsSidebar() {
                             </div>
                             <div class="flex-grow min-w-0">
                                 <h4 class="text-sm font-bold text-gray-100 truncate">${escapeHtml(group.name)}</h4>
-                                <p class="text-xs text-gray-500">Clique para expandir</p>
+                                <p class="text-xs text-gray-500">Clique para visualizar</p>
                             </div>
                         </div>
                         <button class="group-menu-btn p-2 rounded-lg hover:bg-purple-900/30 text-gray-400 hover:text-purple-300 transition-all duration-200 z-10" data-group-id="${group.id}" title="Opções">
@@ -66,19 +107,11 @@ function renderGroupsSidebar() {
                         <span>Convidar Membro</span>
                     </button>
                 </div>
-                
-                <!-- Lista de quadros do grupo -->
-                <div class="group-boards-list space-y-1 px-2 pb-2 hidden" data-group-id="${group.id}">
-                    <div class="flex items-center justify-center py-3">
-                        <div class="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                </div>
             </div>
         `;
         
         // Event listeners
         const groupHeader = groupElement.querySelector('.group-header-item');
-        const boardsList = groupElement.querySelector('.group-boards-list');
         const menuBtn = groupElement.querySelector('.group-menu-btn');
         const menuInline = groupElement.querySelector('.group-menu-inline');
         
@@ -86,18 +119,15 @@ function renderGroupsSidebar() {
         menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             
-            // Fechar outros menus e boards
+            // Fechar outros menus
             document.querySelectorAll('.group-menu-inline').forEach(m => {
                 if (m !== menuInline) m.classList.add('hidden');
-            });
-            document.querySelectorAll('.group-boards-list').forEach(b => {
-                b.classList.add('hidden');
             });
             
             menuInline.classList.toggle('hidden');
         });
         
-        // Toggle boards list
+        // Click no grupo - Carregar quadros do grupo no top selector
         groupHeader.addEventListener('click', function(e) {
             if (e.target.closest('.group-menu-btn')) return;
             e.stopPropagation();
@@ -107,17 +137,18 @@ function renderGroupsSidebar() {
                 m.classList.add('hidden');
             });
             
-            // Fechar outros grupos
-            document.querySelectorAll('.group-boards-list').forEach(list => {
-                if (list !== boardsList) list.classList.add('hidden');
+            // Remover active de outros grupos e botão pessoal
+            document.querySelectorAll('.group-header-item, .personal-kanban').forEach(el => {
+                el.classList.remove('active-group', 'active');
             });
             
-            boardsList.classList.toggle('hidden');
+            // Marcar este grupo como ativo
+            groupHeader.classList.add('active-group');
+            currentGroupId = group.id;
             
-            // Carregar quadros do grupo quando expandir
-            if (!boardsList.classList.contains('hidden') && boardsList.dataset.loaded !== 'true') {
-                loadGroupBoardsInSidebar(group.id, boardsList);
-                boardsList.dataset.loaded = 'true';
+            // Atualizar o seletor de quadros no topo para mostrar apenas quadros deste grupo
+            if (typeof loadGroupBoards === 'function') {
+                loadGroupBoards(group.id);
             }
         });
         
@@ -193,10 +224,14 @@ function loadGroupBoardsInSidebar(groupId, container) {
         boardElement.addEventListener('click', function(e) {
             e.stopPropagation();
             // Remover active de outros
-            document.querySelectorAll('.board-item').forEach(el => {
-                el.classList.remove('active-board');
+            document.querySelectorAll('.board-item, .personal-kanban').forEach(el => {
+                el.classList.remove('active-board', 'active');
             });
             boardElement.classList.add('active-board');
+            
+            // Set current group context
+            currentGroupId = groupId;
+            
             // Selecionar o quadro
             selectBoard(board.id);
         });
@@ -209,6 +244,7 @@ function loadGroupBoardsInSidebar(groupId, container) {
 function setupGroupsSidebar() {
     const createGroupBtn = document.getElementById('create-group-button');
     
+    // Configurar listener do botão "Criar Novo Grupo"
     if (createGroupBtn) {
         createGroupBtn.addEventListener('click', function() {
             openGroupModal();

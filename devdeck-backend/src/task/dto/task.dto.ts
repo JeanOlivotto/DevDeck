@@ -62,4 +62,9 @@ export class UpdateTaskDto {
   @Min(1, { message: 'O ID do quadro deve ser positivo.' })
   @IsOptional() // Opcional ao atualizar, a menos que queira mover entre quadros
   boardId?: number;
+
+  @IsInt({ message: 'O ID do usuário deve ser um número inteiro.' })
+  @Min(1, { message: 'O ID do usuário deve ser positivo.' })
+  @IsOptional() // Opcional, pode ser null ou não incluído
+  assignedUserId?: number;
 }

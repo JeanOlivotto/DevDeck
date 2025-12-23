@@ -26,6 +26,7 @@ model User {
   boards                    Board[]
   groupMembers              GroupMember[]
   groupsOwned               Group[]       @relation("groupOwner")
+  assignedTasks             Task[]
 
   @@map("users")
 }
@@ -82,15 +83,18 @@ model GroupMember {
 }
 
 model Task {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String?
-  status      String   @default("TODO")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  boardId     Int
-  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  id             Int      @id @default(autoincrement())
+  title          String
+  description    String?
+  status         String   @default("TODO")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  boardId        Int
+  assignedUserId Int?
+  board          Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  assignedUser   User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
 
   @@index([boardId], map: "tasks_boardId_fkey")
+  @@index([assignedUserId], map: "tasks_assignedUserId_fkey")
   @@map("tasks")
 }

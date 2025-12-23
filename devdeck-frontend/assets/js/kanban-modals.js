@@ -50,9 +50,13 @@ async function handleTaskDrop(e) {
         const newStatus = this.closest('.column').dataset.status;
         
         try {
+            // Apenas enviar o novo status
+            // O backend fará auto-atribuição baseado no usuário logado
+            const payload = { status: newStatus };
+            
             await DevDeck.fetchApi(`/tasks/${taskId}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ status: newStatus })
+                body: JSON.stringify(payload)
             });
             
             this.appendChild(draggedTaskElement);
@@ -75,6 +79,7 @@ function openTaskModal(task = null, defaultStatus = 'TODO') {
     const taskDescriptionInput = document.getElementById('task-description');
     const taskStatusSelect = document.getElementById('task-status');
     const modalDeleteButton = document.getElementById('modal-delete');
+    const assignedUserDisplay = document.getElementById('assigned-user-display') || createAssignedUserDisplay();
     
     if (task) {
         modalTitle.textContent = 'Editar Tarefa';
@@ -83,6 +88,20 @@ function openTaskModal(task = null, defaultStatus = 'TODO') {
         taskDescriptionInput.value = task.description || '';
         taskStatusSelect.value = task.status;
         modalDeleteButton.classList.remove('hidden');
+        
+        // Mostrar quem está fazendo a tarefa
+        if (task.assignedUser) {
+            assignedUserDisplay.innerHTML = `
+                <strong>👤 Atribuída a:</strong> ${task.assignedUser.name}
+                <small style="color: #a0aec0;">(${task.assignedUser.email})</small>
+            `;
+            assignedUserDisplay.classList.remove('hidden');
+        } else {
+            assignedUserDisplay.innerHTML = `
+                <strong>👤 Atribuída a:</strong> <em style="color: #64748b;">Ninguém está fazendo esta tarefa</em>
+            `;
+            assignedUserDisplay.classList.remove('hidden');
+        }
     } else {
         modalTitle.textContent = 'Nova Tarefa';
         taskIdInput.value = '';
@@ -90,10 +109,30 @@ function openTaskModal(task = null, defaultStatus = 'TODO') {
         taskDescriptionInput.value = '';
         taskStatusSelect.value = defaultStatus;
         modalDeleteButton.classList.add('hidden');
+        assignedUserDisplay.classList.add('hidden');
     }
     
     taskModal.classList.remove('hidden');
     taskTitleInput.focus();
+}
+
+function createAssignedUserDisplay() {
+    const display = document.createElement('div');
+    display.id = 'assigned-user-display';
+    display.style.marginTop = '0.75rem';
+    display.style.paddingTop = '0.75rem';
+    display.style.borderTop = '1px solid rgba(162, 89, 255, 0.2)';
+    display.style.fontSize = '0.875rem';
+    display.style.color = '#a0aec0';
+    display.classList.add('hidden');
+    
+    const taskModal = document.getElementById('task-modal');
+    const modalContent = taskModal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.appendChild(display);
+    }
+    
+    return display;
 }
 
 function closeTaskModal() {
@@ -263,15 +302,23 @@ async function handleBoardSubmit(e) {
             });
         } else {
             // Criar novo board
+            const payload = { name };
+            // Respeitar o contexto atual: grupo ou pessoal
+            if (typeof currentGroupId === 'number' && currentGroupId) {
+                payload.type = 'group';
+                payload.groupId = currentGroupId;
+            } else {
+                payload.type = 'personal';
+            }
             const newBoard = await DevDeck.fetchApi('/boards', {
                 method: 'POST',
-                body: JSON.stringify({ name })
+                body: JSON.stringify(payload)
             });
             currentBoardId = newBoard.id;
         }
         
         closeBoardModal();
-        await loadBoards();
+        await reloadBoardsForCurrentContext();
     } catch (error) {
         console.error('Erro ao salvar quadro:', error);
         const boardError = document.getElementById('board-error');
@@ -299,7 +346,7 @@ async function handleDeleteBoard(boardId, boardName) {
             currentBoardId = null;
         }
         
-        await loadBoards();
+        await reloadBoardsForCurrentContext();
     } catch (error) {
         console.error('Erro ao excluir quadro:', error);
         DevDeck.showAlert(error.message, 'Erro');

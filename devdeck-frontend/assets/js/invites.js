@@ -3,9 +3,15 @@ let pendingInvites = [];
 let invitesRefreshInterval = null;
 
 // Carregar convites pendentes
-async function loadPendingInvites() {
+async function loadPendingInvites(silent = false) {
     try {
-        const invites = await DevDeck.fetchApi('/groups/invites/pending');
+        // Usar fetchApiSilent se disponível (para requisições em background)
+        // Fallback para fetchApi se fetchApiSilent não existir
+        const fetchFunction = (silent && typeof DevDeck.fetchApiSilent === 'function')
+            ? DevDeck.fetchApiSilent
+            : DevDeck.fetchApi;
+        
+        const invites = await fetchFunction('/groups/invites/pending');
         pendingInvites = invites || [];
         updateInvitesDisplay();
         return invites;
@@ -84,16 +90,23 @@ async function handleAcceptInvite(groupId, buttonElement) {
         buttonElement.disabled = true;
         buttonElement.textContent = 'Processando...';
         
-        await DevDeck.fetchApi(`/groups/${groupId}/accept-invite`, {
+        const response = await DevDeck.fetchApi(`/groups/${groupId}/accept-invite`, {
             method: 'POST'
         });
         
-        // Recarregar convites
-        await loadPendingInvites();
+        // Remover convite da lista e recarregar grupos
+        removeInviteFromUI(groupId);
+        hideInvitesIfEmpty();
         
-        // Recarregar grupos
-        if (typeof loadGroups === 'function') {
-            await loadGroups();
+        // Recarregar grupos e re-renderizar TUDO (sidebar, navbar)
+        await loadGroups();
+        
+        // Garantir que as funções existem antes de chamar
+        if (typeof renderGroupsSidebar === 'function') {
+            renderGroupsSidebar();
+        }
+        if (typeof renderGroupsListDropdown === 'function') {
+            renderGroupsListDropdown();
         }
         
         DevDeck.showAlert('Convite aceito com sucesso!', 'Sucesso');
@@ -115,8 +128,9 @@ async function handleRejectInvite(groupId, buttonElement) {
             method: 'POST'
         });
         
-        // Recarregar convites
-        await loadPendingInvites();
+        // Remover convite da lista SEM RECARREGAR TUDO
+        removeInviteFromUI(groupId);
+        hideInvitesIfEmpty();
         
         DevDeck.showAlert('Convite rejeitado', 'Sucesso');
     } catch (error) {
@@ -141,16 +155,20 @@ function escapeHtml(text) {
 
 // Inicializar listeners de convites
 function setupInvitesListeners() {
-    // Recarregar convites periodicamente (a cada 30 segundos)
-    setInterval(loadPendingInvites, 30000);
+    // Recarregar convites periodicamente (a cada 30 segundos) SEM mostrar loading
+    // Usa silent=true se fetchApiSilent existir, senão usa fetchApi normal
+    setInterval(() => {
+        const useSilent = typeof DevDeck.fetchApiSilent === 'function';
+        loadPendingInvites(useSilent);
+    }, 30000);
     
-    // Recarregar ao abrir o menu do usuário
+    // Recarregar ao abrir o menu do usuário (COM loading, pois é ação do usuário)
     const userMenuButton = document.getElementById('user-menu-button');
     if (userMenuButton) {
-        userMenuButton.addEventListener('click', loadPendingInvites);
+        userMenuButton.addEventListener('click', () => loadPendingInvites(false));
     }
     
-    // Botão de refresh de convites
+    // Botão de refresh de convites (COM loading, pois é ação do usuário)
     const refreshButton = document.getElementById('refresh-invites-button');
     if (refreshButton) {
         refreshButton.addEventListener('click', function(e) {
@@ -158,7 +176,7 @@ function setupInvitesListeners() {
             const svg = refreshButton.querySelector('svg');
             svg.style.animation = 'spin 1s linear infinite';
             
-            loadPendingInvites().finally(() => {
+            loadPendingInvites(false).finally(() => {
                 svg.style.animation = '';
             });
         });

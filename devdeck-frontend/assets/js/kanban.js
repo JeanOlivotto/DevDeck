@@ -34,7 +34,8 @@ async function initializeKanban() {
         updateUserDisplay(userData);
     }
     
-    await loadBoards();
+    // Inicializa sempre na visão pessoal para evitar mistura de quadros
+    await loadPersonalBoards();
     await loadUserSettings();
     initializePusher();
 }
@@ -194,6 +195,58 @@ async function loadBoards() {
     }
 }
 
+// Carregar apenas quadros pessoais
+async function loadPersonalBoards() {
+    try {
+        const boards = await DevDeck.fetchApi('/boards?groupId=personal');
+        allBoards = boards;
+        
+        if (boards.length === 0) {
+            showNoBoardsMessage();
+        } else {
+            renderBoardSelectors(boards);
+            if (currentBoardId === null || !boards.find(b => b.id === currentBoardId)) {
+                currentBoardId = boards[0].id;
+            }
+            await loadTasks(currentBoardId);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar quadros pessoais:', error);
+        DevDeck.showAlert('Erro ao carregar quadros pessoais', 'Erro');
+    }
+}
+
+// Carregar apenas quadros de um grupo específico
+async function loadGroupBoards(groupId) {
+    try {
+        const boards = await DevDeck.fetchApi(`/boards?groupId=${groupId}`);
+        allBoards = boards;
+        
+        if (boards.length === 0) {
+            showNoBoardsMessage();
+        } else {
+            renderBoardSelectors(boards);
+            if (currentBoardId === null || !boards.find(b => b.id === currentBoardId)) {
+                currentBoardId = boards[0].id;
+            }
+            await loadTasks(currentBoardId);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar quadros do grupo:', error);
+        DevDeck.showAlert('Erro ao carregar quadros do grupo', 'Erro');
+    }
+}
+
+// Recarregar boards respeitando o contexto atual (pessoal ou grupo)
+async function reloadBoardsForCurrentContext() {
+    if (currentGroupId) {
+        // Se está visualizando um grupo, recarregar apenas quadros daquele grupo
+        await loadGroupBoards(currentGroupId);
+    } else {
+        // Se está visualizando pessoal, recarregar apenas quadros pessoais
+        await loadPersonalBoards();
+    }
+}
 function showNoBoardsMessage() {
     if (noBoardsMessage) noBoardsMessage.classList.remove('hidden');
     if (kanbanBoardSection) kanbanBoardSection.classList.add('hidden');
@@ -209,6 +262,12 @@ function renderBoardSelectors(boards) {
     if (!boardsContainer) return;
     
     boardsContainer.innerHTML = '';
+    
+    // Adicionar título da seção de quadros
+    const boardsTitle = document.createElement('div');
+    boardsTitle.className = 'px-3 py-2 text-sm font-semibold text-gray-400';
+    boardsTitle.textContent = 'Quadros';
+    boardsContainer.appendChild(boardsTitle);
     
     boards.forEach(board => {
         const button = document.createElement('button');
@@ -315,11 +374,35 @@ function createTaskElement(task) {
     title.className = 'task-title';
     title.textContent = task.title;
     
+    // Header: título + avatar ao lado
+    const headerRow = document.createElement('div');
+    headerRow.className = 'task-header-row';
+    
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'task-header-left';
+    headerLeft.appendChild(title);
+    headerRow.appendChild(headerLeft);
+    
+    if (task.assignedUser) {
+        const initials = task.assignedUser.name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'task-assigned-avatar';
+        avatar.textContent = initials;
+        avatar.title = `Atribuído a: ${task.assignedUser.name} (${task.assignedUser.email})`;
+        headerRow.appendChild(avatar);
+    }
+    
+    div.appendChild(headerRow);
+    
     const description = document.createElement('p');
     description.className = 'task-description';
     description.textContent = task.description || 'Sem descrição';
-    
-    div.appendChild(title);
     div.appendChild(description);
     
     div.addEventListener('click', () => {
@@ -341,7 +424,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
         // Verificar se o token é válido
         const user = await DevDeck.fetchApi('/user/me');
-        DevDeck.setUserData(user.email, user.name);
+        DevDeck.setUserData(user.email, user.name, user.id);
         
         currentUserSettings = {
             notifyDailySummary: user.notifyDailySummary,

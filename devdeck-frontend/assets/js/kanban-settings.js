@@ -392,15 +392,15 @@ function initializePusher() {
         });
         
         pusherChannel.bind('board_created', async () => {
-            await loadBoards();
+            await reloadBoardsForCurrentContext();
         });
         
         pusherChannel.bind('board_updated', async () => {
-            await loadBoards();
+            await reloadBoardsForCurrentContext();
         });
         
         pusherChannel.bind('board_deleted', async () => {
-            await loadBoards();
+            await reloadBoardsForCurrentContext();
         });
     } catch (error) {
         console.error('Erro ao inicializar Pusher:', error);

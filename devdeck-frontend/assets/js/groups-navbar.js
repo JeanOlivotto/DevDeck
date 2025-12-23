@@ -5,9 +5,26 @@
 function renderGroupsListDropdown() {
     const groupsList = document.getElementById('groups-list-dropdown');
     
-    if (!groupsList || allGroups.length === 0) {
-        if (groupsList) {
-            groupsList.innerHTML = '<p class="text-sm text-gray-500 p-3">Nenhum grupo</p>';
+    if (!groupsList) return;
+    
+    // Se não há grupos, mostrar mensagem com opção de criar
+    if (!allGroups || allGroups.length === 0) {
+        groupsList.innerHTML = `
+            <div class="p-3 text-center">
+                <p class="text-sm text-gray-500 mb-3">Você ainda não tem grupos</p>
+                <button id="create-group-from-dropdown" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-xs py-2 px-3 rounded-lg transition-all duration-200">
+                    + Criar Novo Grupo
+                </button>
+            </div>
+        `;
+        
+        // Event listener para criar grupo
+        const createBtn = groupsList.querySelector('#create-group-from-dropdown');
+        if (createBtn) {
+            createBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                openGroupModal();
+            });
         }
         return;
     }

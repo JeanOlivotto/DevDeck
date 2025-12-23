@@ -94,7 +94,10 @@ export class BoardService implements OnModuleInit {
   async findAll(userId: number, groupId?: number) {
     const where: any = {};
 
-    if (groupId) {
+    if (groupId === -1) {
+      // Special case: return only personal boards
+      where.userId = userId;
+    } else if (groupId) {
       // Se groupId fornecido, retorna apenas boards do grupo
       where.groupId = groupId;
 

@@ -120,11 +120,68 @@ body {
     border-left: 4px solid #a259ff;
     transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
     cursor: grab;
+    position: relative;
 }
 
 .task-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 6px 20px rgba(162, 89, 255, 0.35);
+}
+
+/* Header com título e avatar ao lado */
+.task-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.task-header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.task-assigned-section {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(162, 89, 255, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 32px;
+}
+
+.task-assigned-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #00eaff, #a259ff);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: default;
+    flex-shrink: 0;
+}
+
+.task-assigned-name {
+    font-size: 0.875rem;
+    color: #a0aec0;
+    font-weight: 500;
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.task-assigned-empty {
+    font-size: 0.875rem;
+    color: #64748b;
+    font-style: italic;
+    width: 100%;
 }
 
 .add-task-button {
@@ -175,6 +232,17 @@ body {
     background-color: rgba(0, 234, 255, 0.1);
     border-color: #00eaff;
     font-weight: 600;
+}
+
+/* Estilos de Grupos Ativos */
+.group-header-item.active-group {
+    background-color: rgba(162, 89, 255, 0.15);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+
+.group-header-item.active-group h4 {
+    color: #a259ff;
 }
 
 .board-button.drag-over-board {

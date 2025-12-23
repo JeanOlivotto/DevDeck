@@ -45,9 +45,14 @@ export class BoardController {
     let groupIdNum: number | undefined = undefined;
 
     if (groupId !== undefined) {
-      groupIdNum = parseInt(groupId, 10);
-      if (isNaN(groupIdNum)) {
-        throw new BadRequestException('groupId deve ser um número válido');
+      // Handle special case for "personal" filter
+      if (groupId === 'personal') {
+        groupIdNum = -1; // Special marker for personal boards only
+      } else {
+        groupIdNum = parseInt(groupId, 10);
+        if (isNaN(groupIdNum)) {
+          throw new BadRequestException('groupId deve ser um número válido');
+        }
       }
     }
 
