@@ -20,17 +20,27 @@ define('TOKEN_KEY', 'devdeck_auth_token');
 date_default_timezone_set('America/Sao_Paulo');
 
 // Detectar base path automaticamente
-$scriptPath = dirname($_SERVER['SCRIPT_NAME']);
-$basePath = ($scriptPath === '/' || $scriptPath === '\\') ? '' : $scriptPath;
+$documentRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/');
+$scriptPath = dirname($_SERVER['SCRIPT_FILENAME']);
+$basePath = str_replace($documentRoot, '', $scriptPath);
+$basePath = str_replace('\\', '/', $basePath); // Windows compatibility
+$basePath = '/' . ltrim($basePath, '/'); // ensure leading slash
+$basePath = rtrim($basePath, '/');
+
 // Remove /views do path se existir, pois os assets estão na raiz
-$basePath = str_replace('/views', '', $basePath);
+if (function_exists('str_ends_with') ? str_ends_with($basePath, '/views') : substr($basePath, -6) === '/views') {
+    $basePath = substr($basePath, 0, -6); // Remove os últimos 6 caracteres (/views)
+}
+
 define('BASE_PATH', $basePath);
 
 // Função helper para criar URLs corretas
 function url($path) {
     $path = ltrim($path, '/');
-    $base = BASE_PATH ? BASE_PATH . '/' : '/';
-    return $base . $path;
+    if (BASE_PATH) {
+        return BASE_PATH . '/' . $path;
+    }
+    return '/' . $path;
 }
 
 // Iniciar sessão

@@ -3,7 +3,7 @@ require_once __DIR__ . '/config/config.php';
 
 // Redirecionar para dashboard se já estiver logado
 if (isLoggedIn()) {
-    redirect('/views/dashboard.php');
+    redirect(url('views/dashboard.php'));
 }
 
 $pageTitle = 'DevDeck - Login';

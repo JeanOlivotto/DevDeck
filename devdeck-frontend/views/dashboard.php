@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 
 // Redirecionar para login se não estiver autenticado
 if (!isLoggedIn()) {
-    redirect('/index.php');
+    redirect(url('index.php'));
 }
 
 $pageTitle = 'DevDeck - Dashboard';

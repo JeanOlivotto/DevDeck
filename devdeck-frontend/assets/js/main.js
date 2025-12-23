@@ -120,7 +120,7 @@ async function fetchApi(endpoint, options = {}, requireAuth = true) {
         if (!response.ok) {
             if (response.status === 401 && requireAuth) {
                 clearAuthData();
-                window.location.href = '/index.php';
+                window.location.href = BASE_PATH + '/index.php';
                 throw new Error('Sessão inválida. Faça login novamente.');
             }
             

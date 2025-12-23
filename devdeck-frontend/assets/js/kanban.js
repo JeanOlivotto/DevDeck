@@ -148,7 +148,7 @@ function generateAvatarColor(seed) {
 async function handleLogout() {
     DevDeck.clearAuthData();
     disconnectPusher();
-    window.location.href = '/index.php';
+    window.location.href = BASE_PATH + '/index.php';
 }
 
 // Boards
@@ -332,6 +332,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch (error) {
         console.error('Erro ao inicializar:', error);
         DevDeck.clearAuthData();
-        window.location.href = '/index.php';
+        window.location.href = BASE_PATH + '/index.php';
     }
 });

@@ -4,7 +4,7 @@
  * Pode ser usado como endpoint ou incluído em páginas
  */
 
-require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/../config/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'logout') {
     clearAuthData();
@@ -15,4 +15,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Se acessado diretamente via GET, redirecionar para index
 clearAuthData();
-redirect('/index.php');
+redirect(url('index.php'));
