@@ -80,6 +80,7 @@ function openTaskModal(task = null, defaultStatus = 'TODO') {
     const taskStatusSelect = document.getElementById('task-status');
     const modalDeleteButton = document.getElementById('modal-delete');
     const assignedUserDisplay = document.getElementById('assigned-user-display') || createAssignedUserDisplay();
+    const subtaskUI = ensureSubtasksSection();
     
     if (task) {
         modalTitle.textContent = 'Editar Tarefa';
@@ -102,6 +103,9 @@ function openTaskModal(task = null, defaultStatus = 'TODO') {
             `;
             assignedUserDisplay.classList.remove('hidden');
         }
+
+        // Renderizar subtarefas
+        renderModalSubtasks(task, subtaskUI);
     } else {
         modalTitle.textContent = 'Nova Tarefa';
         taskIdInput.value = '';
@@ -110,10 +114,160 @@ function openTaskModal(task = null, defaultStatus = 'TODO') {
         taskStatusSelect.value = defaultStatus;
         modalDeleteButton.classList.add('hidden');
         assignedUserDisplay.classList.add('hidden');
+
+        // Limpar subtarefas e bloquear adição até salvar
+        renderModalSubtasks(null, subtaskUI);
     }
     
     taskModal.classList.remove('hidden');
     taskTitleInput.focus();
+}
+
+function ensureSubtasksSection() {
+    let section = document.getElementById('subtasks-section');
+    if (section) {
+        return {
+            section,
+            list: section.querySelector('#subtasks-list'),
+            empty: section.querySelector('#subtasks-empty'),
+            input: section.querySelector('#new-subtask-title'),
+            addButton: section.querySelector('#add-subtask-btn'),
+        };
+    }
+
+    section = document.createElement('div');
+    section.id = 'subtasks-section';
+    section.className = 'subtasks-section';
+
+    const heading = document.createElement('div');
+    heading.className = 'subtasks-heading';
+    heading.textContent = 'Subtarefas (opcionais)';
+    section.appendChild(heading);
+
+    const list = document.createElement('div');
+    list.id = 'subtasks-list';
+    list.className = 'subtasks-list';
+    section.appendChild(list);
+
+    const empty = document.createElement('div');
+    empty.id = 'subtasks-empty';
+    empty.className = 'task-subtasks-empty';
+    empty.textContent = 'Nenhuma subtarefa ainda.';
+    section.appendChild(empty);
+
+    const addRow = document.createElement('div');
+    addRow.className = 'task-subtasks-add';
+    
+    const input = document.createElement('input');
+    input.id = 'new-subtask-title';
+    input.type = 'text';
+    input.placeholder = 'Adicionar subtarefa';
+    addRow.appendChild(input);
+
+    const addButton = document.createElement('button');
+    addButton.id = 'add-subtask-btn';
+    addButton.type = 'button';
+    addButton.textContent = 'Adicionar';
+    addButton.addEventListener('click', handleAddSubtaskFromModal);
+    addRow.appendChild(addButton);
+
+    section.appendChild(addRow);
+
+    const taskModal = document.getElementById('task-modal');
+    const modalContent = taskModal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.appendChild(section);
+    }
+
+    return { section, list, empty, input, addButton };
+}
+
+function renderModalSubtasks(task, subtaskUI) {
+    const { list, empty, input, addButton } = subtaskUI;
+
+    list.innerHTML = '';
+
+    if (!task || !task.id) {
+        empty.textContent = 'Salve a tarefa para adicionar subtarefas.';
+        empty.classList.remove('hidden');
+        input.value = '';
+        input.disabled = true;
+        addButton.disabled = true;
+        return;
+    }
+
+    input.disabled = false;
+    addButton.disabled = false;
+
+    if (!task.subtasks || task.subtasks.length === 0) {
+        empty.textContent = 'Nenhuma subtarefa ainda.';
+        empty.classList.remove('hidden');
+    } else {
+        empty.classList.add('hidden');
+        task.subtasks.forEach((subtask) => {
+            const item = document.createElement('label');
+            item.className = 'task-subtask-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'task-subtask-checkbox';
+            checkbox.checked = !!subtask.completed;
+            checkbox.addEventListener('change', async (e) => {
+                e.stopPropagation();
+                try {
+                    await toggleSubtaskCompletion(task.id, subtask.id, e.target.checked);
+                    await refreshModalSubtasks(task.id);
+                } catch (err) {
+                    console.error('Erro ao atualizar subtarefa:', err);
+                    DevDeck.showAlert('Erro ao atualizar subtarefa', 'Erro');
+                }
+            });
+
+            const text = document.createElement('span');
+            text.className = 'task-subtask-text' + (subtask.completed ? ' completed' : '');
+            text.textContent = subtask.title;
+
+            item.appendChild(checkbox);
+            item.appendChild(text);
+            list.appendChild(item);
+        });
+    }
+}
+
+async function handleAddSubtaskFromModal() {
+    const taskId = document.getElementById('task-id').value;
+    const input = document.getElementById('new-subtask-title');
+    const title = (input.value || '').trim();
+
+    if (!taskId) {
+        DevDeck.showAlert('Salve a tarefa antes de adicionar subtarefas.', 'Aviso');
+        return;
+    }
+
+    if (!title) return;
+
+    try {
+        await DevDeck.fetchApi(`/tasks/${taskId}/subtasks`, {
+            method: 'POST',
+            body: JSON.stringify({ title })
+        });
+        input.value = '';
+        await loadTasks(currentBoardId);
+        await refreshModalSubtasks(taskId);
+    } catch (err) {
+        console.error('Erro ao adicionar subtarefa:', err);
+        DevDeck.showAlert('Erro ao adicionar subtarefa', 'Erro');
+    }
+}
+
+async function refreshModalSubtasks(taskId) {
+    try {
+        const task = await DevDeck.fetchApi(`/tasks/${taskId}`);
+        const subtaskUI = ensureSubtasksSection();
+        renderModalSubtasks(task, subtaskUI);
+    } catch (err) {
+        console.error('Erro ao recarregar subtarefas:', err);
+    }
 }
 
 function createAssignedUserDisplay() {

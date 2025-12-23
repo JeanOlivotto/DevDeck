@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   Min,
+  IsBoolean,
 } from 'class-validator';
 
 // Status possíveis para uma tarefa
@@ -67,4 +68,30 @@ export class UpdateTaskDto {
   @Min(1, { message: 'O ID do usuário deve ser positivo.' })
   @IsOptional() // Opcional, pode ser null ou não incluído
   assignedUserId?: number;
+}
+
+export class CreateSubtaskDto {
+  @IsString({ message: 'O título da subtarefa deve ser uma string.' })
+  @IsNotEmpty({ message: 'O título da subtarefa não pode estar vazio.' })
+  @MaxLength(255, {
+    message: 'O título da subtarefa não pode ter mais que 255 caracteres.',
+  })
+  title: string;
+
+  @IsBoolean({ message: 'O campo completed deve ser booleano.' })
+  @IsOptional()
+  completed?: boolean;
+}
+
+export class UpdateSubtaskDto {
+  @IsString({ message: 'O título da subtarefa deve ser uma string.' })
+  @IsOptional()
+  @MaxLength(255, {
+    message: 'O título da subtarefa não pode ter mais que 255 caracteres.',
+  })
+  title?: string;
+
+  @IsBoolean({ message: 'O campo completed deve ser booleano.' })
+  @IsOptional()
+  completed?: boolean;
 }

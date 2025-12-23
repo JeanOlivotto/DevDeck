@@ -404,12 +404,21 @@ function createTaskElement(task) {
     description.className = 'task-description';
     description.textContent = task.description || 'Sem descrição';
     div.appendChild(description);
+
     
     div.addEventListener('click', () => {
         openTaskModal(task);
     });
     
     return div;
+}
+
+async function toggleSubtaskCompletion(taskId, subtaskId, completed) {
+    await DevDeck.fetchApi(`/tasks/${taskId}/subtasks/${subtaskId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ completed })
+    });
+    await loadTasks(currentBoardId);
 }
 
 // Inicialização ao carregar DOM

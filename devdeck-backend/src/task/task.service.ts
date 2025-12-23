@@ -5,7 +5,12 @@ import {
   Logger, // <-- Opcional: Importe Logger
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
+import {
+  CreateTaskDto,
+  UpdateTaskDto,
+  CreateSubtaskDto,
+  UpdateSubtaskDto,
+} from './dto/task.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -22,9 +27,10 @@ export class TaskService {
     try {
       return await this.prisma.task.create({
         data: createTaskDto, // boardId já está no DTO
-        include: { 
+        include: {
           board: true,
-          assignedUser: { select: { id: true, name: true, email: true } }
+          assignedUser: { select: { id: true, name: true, email: true } },
+          subtasks: { orderBy: { createdAt: 'asc' } },
         },
       });
     } catch (error) {
@@ -63,9 +69,10 @@ export class TaskService {
 
     return await this.prisma.task.findMany({
       where: whereCondition,
-      include: { 
+      include: {
         board: true,
-        assignedUser: { select: { id: true, name: true, email: true } }
+        assignedUser: { select: { id: true, name: true, email: true } },
+        subtasks: { orderBy: { createdAt: 'asc' } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -80,6 +87,7 @@ export class TaskService {
           include: { group: { include: { members: true } } },
         },
         assignedUser: { select: { id: true, name: true, email: true } },
+        subtasks: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -140,9 +148,10 @@ export class TaskService {
       return await this.prisma.task.update({
         where: { id }, // Não precisa mais where: { id, board: { userId } }
         data: dataToUpdate,
-        include: { 
+        include: {
           board: true,
-          assignedUser: { select: { id: true, name: true, email: true } }
+          assignedUser: { select: { id: true, name: true, email: true } },
+          subtasks: { orderBy: { createdAt: 'asc' } },
         },
       });
     } catch (error) {
@@ -207,5 +216,62 @@ export class TaskService {
     }
 
     return board;
+  }
+
+  // Subtasks
+  async createSubtask(
+    taskId: number,
+    createSubtaskDto: CreateSubtaskDto,
+    userId: number,
+  ) {
+    await this.findOne(taskId, userId);
+
+    return this.prisma.subtask.create({
+      data: {
+        title: createSubtaskDto.title,
+        completed: createSubtaskDto.completed ?? false,
+        taskId,
+      },
+    });
+  }
+
+  async updateSubtask(
+    taskId: number,
+    subtaskId: number,
+    updateSubtaskDto: UpdateSubtaskDto,
+    userId: number,
+  ) {
+    await this.findOne(taskId, userId);
+
+    const subtask = await this.prisma.subtask.findUnique({
+      where: { id: subtaskId },
+    });
+
+    if (!subtask || subtask.taskId !== taskId) {
+      throw new NotFoundException(
+        `Subtarefa com ID ${subtaskId} não encontrada para a tarefa ${taskId}.`,
+      );
+    }
+
+    return this.prisma.subtask.update({
+      where: { id: subtaskId },
+      data: updateSubtaskDto,
+    });
+  }
+
+  async removeSubtask(taskId: number, subtaskId: number, userId: number) {
+    await this.findOne(taskId, userId);
+
+    const subtask = await this.prisma.subtask.findUnique({
+      where: { id: subtaskId },
+    });
+
+    if (!subtask || subtask.taskId !== taskId) {
+      throw new NotFoundException(
+        `Subtarefa com ID ${subtaskId} não encontrada para a tarefa ${taskId}.`,
+      );
+    }
+
+    await this.prisma.subtask.delete({ where: { id: subtaskId } });
   }
 }

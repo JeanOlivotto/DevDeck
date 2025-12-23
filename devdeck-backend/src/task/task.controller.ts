@@ -15,7 +15,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
-import { CreateTaskDto, UpdateTaskDto } from './dto/task.dto';
+import {
+  CreateTaskDto,
+  UpdateTaskDto,
+  CreateSubtaskDto,
+  UpdateSubtaskDto,
+} from './dto/task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('tasks')
@@ -70,5 +75,44 @@ export class TaskController {
   remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
     const userId = req.user.userId;
     return this.taskService.remove(id, userId);
+  }
+
+  // Subtasks
+  @Post(':id/subtasks')
+  @HttpCode(HttpStatus.CREATED)
+  createSubtask(
+    @Param('id', ParseIntPipe) taskId: number,
+    @Body() createSubtaskDto: CreateSubtaskDto,
+    @Req() req,
+  ) {
+    const userId = req.user.userId;
+    return this.taskService.createSubtask(taskId, createSubtaskDto, userId);
+  }
+
+  @Patch(':taskId/subtasks/:subtaskId')
+  updateSubtask(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('subtaskId', ParseIntPipe) subtaskId: number,
+    @Body() updateSubtaskDto: UpdateSubtaskDto,
+    @Req() req,
+  ) {
+    const userId = req.user.userId;
+    return this.taskService.updateSubtask(
+      taskId,
+      subtaskId,
+      updateSubtaskDto,
+      userId,
+    );
+  }
+
+  @Delete(':taskId/subtasks/:subtaskId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeSubtask(
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Param('subtaskId', ParseIntPipe) subtaskId: number,
+    @Req() req,
+  ) {
+    const userId = req.user.userId;
+    return this.taskService.removeSubtask(taskId, subtaskId, userId);
   }
 }

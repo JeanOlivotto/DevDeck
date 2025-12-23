@@ -93,8 +93,23 @@ model Task {
   assignedUserId Int?
   board          Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   assignedUser   User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  subtasks       Subtask[]
 
   @@index([boardId], map: "tasks_boardId_fkey")
   @@index([assignedUserId], map: "tasks_assignedUserId_fkey")
   @@map("tasks")
+}
+
+model Subtask {
+  id        Int      @id @default(autoincrement())
+  title     String
+  completed Boolean  @default(false)
+  taskId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId], map: "subtasks_taskId_fkey")
+  @@map("subtasks")
 }
