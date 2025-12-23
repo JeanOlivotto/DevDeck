@@ -9,7 +9,9 @@ function getAuthToken() {
 }
 
 function setAuthToken(token) {
+    console.log('setAuthToken called with:', token?.substring(0, 20)); // DEBUG
     localStorage.setItem(TOKEN_KEY, token);
+    console.log('Token saved to localStorage'); // DEBUG
 }
 
 function clearAuthData() {
@@ -19,8 +21,10 @@ function clearAuthData() {
 }
 
 function setUserData(email, name) {
+    console.log('setUserData called:', email, name); // DEBUG
     localStorage.setItem(USER_EMAIL_KEY, email);
     localStorage.setItem(USER_NAME_KEY, name);
+    console.log('User data saved'); // DEBUG
 }
 
 function getUserData() {

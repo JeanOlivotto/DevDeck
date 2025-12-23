@@ -21,15 +21,35 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({ email, password })
                 }, false);
                 
+                console.log('Login response:', data); // DEBUG
+                
                 if (data?.access_token) {
+                    console.log('Token received, calling setAuthToken'); // DEBUG
                     DevDeck.setAuthToken(data.access_token);
+                    console.log('Token set, localStorage:', localStorage.getItem('devdeck_auth_token')?.substring(0, 20)); // DEBUG
                     
                     if (data.user) {
+                        console.log('Setting user data:', data.user.email); // DEBUG
                         DevDeck.setUserData(data.user.email, data.user.name);
                     }
                     
+                    // Sincronizar session PHP com o token JWT
+                    console.log('Syncing PHP session...'); // DEBUG
+                    await fetch(BASE_PATH + '/api/set-session.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            token: data.access_token,
+                            email: data.user?.email,
+                            name: data.user?.name
+                        })
+                    }).catch(e => console.warn('Session sync warning:', e)); // DEBUG
+                    
+                    console.log('BASE_PATH value:', BASE_PATH); // DEBUG
+                    console.log('Redirect URL:', BASE_PATH + '/views/dashboard.php'); // DEBUG
                     // Redirecionar para dashboard
                     window.location.href = BASE_PATH + '/views/dashboard.php';
+                    console.log('Redirect triggered'); // DEBUG
                 } else {
                     throw new Error('Token de autenticação não recebido');
                 }
@@ -84,6 +104,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.user) {
                         DevDeck.setUserData(data.user.email, data.user.name);
                     }
+                    
+                    // Sincronizar session PHP com o token JWT
+                    await fetch(BASE_PATH + '/api/set-session.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            token: data.access_token,
+                            email: data.user?.email,
+                            name: data.user?.name
+                        })
+                    }).catch(e => console.warn('Session sync warning:', e));
                     
                     // Redirecionar para dashboard
                     window.location.href = BASE_PATH + '/views/dashboard.php';
