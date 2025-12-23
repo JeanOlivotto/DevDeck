@@ -8,40 +8,40 @@ datasource db {
 }
 
 model User {
-  id                        Int             @id @default(autoincrement())
-  email                     String          @unique
+  id                        Int           @id @default(autoincrement())
+  email                     String        @unique
   name                      String
   password                  String
   whatsappNumber            String?
-  notifyViaWhatsApp         Boolean         @default(false)
+  notifyViaWhatsApp         Boolean       @default(false)
   whatsappSession           String?
-  createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
-  notifyDailySummary        Boolean         @default(true)
-  notifyStaleTasks          Boolean         @default(true)
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  notifyDailySummary        Boolean       @default(true)
+  notifyStaleTasks          Boolean       @default(true)
   whatsappMetaPhoneNumberId String?
   whatsappMetaAccessToken   String?
-  whatsappMessagesThisMonth Int             @default(0)
+  whatsappMessagesThisMonth Int           @default(0)
   whatsappMonthResetDate    DateTime?
   boards                    Board[]
-  groupsOwned               Group[]         @relation("groupOwner")
   groupMembers              GroupMember[]
+  groupsOwned               Group[]       @relation("groupOwner")
 
   @@map("users")
 }
 
 model Board {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
-  order     Int       @default(0)
-  type      String    @default("personal")
+  order     Int      @default(0)
+  type      String   @default("personal")
   userId    Int?
-  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   groupId   Int?
-  group     Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  group     Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks     Task[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
 
   @@unique([name, userId, groupId])
   @@index([userId], map: "boards_userId_fkey")
@@ -54,11 +54,11 @@ model Group {
   name        String
   description String?
   createdBy   Int
-  owner       User          @relation("groupOwner", fields: [createdBy], references: [id], onDelete: Cascade)
-  members     GroupMember[]
-  boards      Board[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  boards      Board[]
+  members     GroupMember[]
+  owner       User          @relation("groupOwner", fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([createdBy], map: "groups_createdBy_fkey")
   @@map("groups")
@@ -67,13 +67,13 @@ model Group {
 model GroupMember {
   id           Int      @id @default(autoincrement())
   groupId      Int
-  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   userId       Int
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role         String   @default("member")
   inviteStatus String   @default("pending")
   joinedAt     DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, userId])
   @@index([groupId], map: "group_members_groupId_fkey")

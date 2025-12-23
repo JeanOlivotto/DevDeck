@@ -309,3 +309,108 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* Estilos para Grupos */
+.group-button {
+    color: #cbd5e1;
+    transition: all 0.2s ease;
+}
+
+.group-button:hover {
+    background-color: rgba(162, 89, 255, 0.1);
+    color: #e0e6ff;
+}
+
+.group-item-button {
+    color: #cbd5e1;
+    transition: all 0.2s ease;
+}
+
+.group-item-button:hover {
+    background-color: rgba(162, 89, 255, 0.15);
+    color: #e0e6ff;
+}
+
+.group-item-menu {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Custom Scrollbar para Sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(30, 35, 68, 0.3);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #a259ff, #00eaff);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #00eaff, #a259ff);
+}
+
+/* Animação para items do grupo */
+.group-item {
+    animation: slideInLeft 0.3s ease-out forwards;
+    opacity: 0;
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Animação para items de board */
+.board-item {
+    animation: fadeInScale 0.2s ease-out forwards;
+    opacity: 0;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Board ativo */
+.board-item.active-board {
+    background: linear-gradient(to right, rgba(162, 89, 255, 0.2), rgba(0, 234, 255, 0.2));
+    border-color: rgba(162, 89, 255, 0.5) !important;
+}

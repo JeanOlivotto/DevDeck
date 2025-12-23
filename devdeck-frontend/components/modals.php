@@ -86,6 +86,66 @@
 <!-- WhatsApp Tutorial Modal -->
 <?php include __DIR__ . '/whatsapp-tutorial-modal.php'; ?>
 
+<!-- Group Modal -->
+<div id="group-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+    <div class="modal-content p-6 rounded-lg w-full max-w-md mx-4">
+        <h3 id="group-modal-title" class="text-xl font-semibold mb-4 text-cyan-300">Novo Grupo</h3>
+        <form id="group-form">
+            <div class="mb-4">
+                <label for="group-name" class="block text-sm font-medium mb-1">Nome:</label>
+                <input type="text" id="group-name" name="name" class="modal-input w-full p-2 rounded" required maxlength="100">
+            </div>
+            <div class="mb-6">
+                <label for="group-description" class="block text-sm font-medium mb-1">Descrição:</label>
+                <textarea id="group-description" name="description" rows="3" class="modal-textarea w-full p-2 rounded" maxlength="500"></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="group-modal-cancel" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">Cancelar</button>
+                <button type="submit" class="modal-button text-white font-semibold py-2 px-4 rounded-lg">Salvar</button>
+                <button type="button" id="group-modal-delete" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg hidden">Deletar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Invite Member Modal -->
+<div id="invite-member-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+    <div class="modal-content p-6 rounded-lg w-full max-w-md mx-4">
+        <h3 class="text-xl font-semibold mb-4 text-cyan-300">Convidar Membro</h3>
+        <form id="invite-member-form">
+            <input type="hidden" id="invite-group-id">
+            <div class="mb-4">
+                <label for="invite-email" class="block text-sm font-medium mb-1">Email:</label>
+                <input type="email" id="invite-email" name="email" class="modal-input w-full p-2 rounded" required>
+            </div>
+            <div class="mb-6">
+                <label for="invite-role" class="block text-sm font-medium mb-1">Função:</label>
+                <select id="invite-role" name="role" class="modal-select w-full p-2 rounded">
+                    <option value="member">Membro</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="invite-member-modal-cancel" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">Cancelar</button>
+                <button type="submit" class="modal-button text-white font-semibold py-2 px-4 rounded-lg">Convidar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Group Members Modal -->
+<div id="group-members-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
+    <div class="modal-content p-6 rounded-lg w-full max-w-md mx-4 max-h-[80vh] overflow-auto">
+        <h3 id="group-members-modal-title" class="text-xl font-semibold mb-4 text-cyan-300">Membros do Grupo</h3>
+        <div id="group-members-container" class="space-y-2 mb-6">
+            <p class="text-gray-400 text-sm">Carregando membros...</p>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button type="button" id="group-members-modal-close" class="modal-close-button text-white font-semibold py-2 px-4 rounded-lg">Fechar</button>
+        </div>
+    </div>
+</div>
+
 <!-- SVG Icons -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
     <symbol id="icon-pencil" viewBox="0 0 20 20" fill="currentColor">

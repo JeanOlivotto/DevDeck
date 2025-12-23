@@ -67,6 +67,14 @@ function setupEventListeners() {
     // WhatsApp Meta
     setupWhatsAppMetaListeners();
     
+    // Convites de grupos
+    setupInvitesListeners();
+    loadPendingInvites();
+    
+    // Modais de grupos
+    setupGroupModalListeners();
+    loadGroups();
+    
     // Botões de adicionar tarefa
     document.querySelectorAll('.add-task-button').forEach(btn => {
         btn.addEventListener('click', function() {

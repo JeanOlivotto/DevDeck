@@ -1,3 +1,6 @@
+<!-- EXEMPLO DE INTEGRAÇÃO COMPLETA NO NAVBAR -->
+<!-- Copie e Cole este código no components/navbar.php para adicionar grupos -->
+
 <?php if (isLoggedIn()): ?>
 <header class="w-full max-w-7xl flex items-center justify-between mb-6 sm:mb-10 px-4">
     <div class="flex items-center flex-shrink-0">
@@ -32,25 +35,44 @@
             <!-- Seção de Convites Pendentes -->
             <div id="invites-section" class="border-b border-gray-700">
                 <div class="p-3 bg-gray-800/50">
-                    <div class="flex items-center justify-between">
-                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M15 8a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                <path fill-rule="evenodd" d="M12.316 1.872a1 1 0 01.582.756l1.537 9.694a1 1 0 01-.966 1.166H5.531a1 1 0 01-.966-1.166l1.537-9.694a1 1 0 01.582-.756A6.974 6.974 0 0110 0c1.995 0 3.888.422 5.316 1.172zM5 14a2 2 0 00-2 2v2h14v-2a2 2 0 00-2-2H5z" clip-rule="evenodd"></path>
-                            </svg>
-                            Convites Pendentes
-                        </h4>
-                        <button id="refresh-invites-button" class="text-cyan-400 hover:text-cyan-300 transition-colors" title="Atualizar">
-                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 1119.414 4.414c-.474.565-1.21.667-1.784.198-.573-.469-.67-1.208-.196-1.781A5.002 5.002 0 005.064 5H7a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm0 12a1 1 0 01.967-.252l2.121 1.061a1 1 0 10.896-1.789l-2.121-1.061A1 1 0 014 14z" clip-rule="evenodd"></path>
-                            </svg>
-                        </button>
-                    </div>
+                    <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M15 8a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path fill-rule="evenodd" d="M12.316 1.872a1 1 0 01.582.756l1.537 9.694a1 1 0 01-.966 1.166H5.531a1 1 0 01-.966-1.166l1.537-9.694a1 1 0 01.582-.756A6.974 6.974 0 0110 0c1.995 0 3.888.422 5.316 1.172zM5 14a2 2 0 00-2 2v2h14v-2a2 2 0 00-2-2H5z" clip-rule="evenodd"></path>
+                        </svg>
+                        Convites de Grupos
+                    </h4>
                 </div>
                 <div id="pending-invites-container" class="max-h-48 overflow-y-auto">
                     <p class="text-sm text-gray-500 p-3">Carregando...</p>
                 </div>
             </div>
+            
+            <!-- [OPCIONAL] Seção de Meus Grupos -->
+            <!-- Descomente para adicionar lista de grupos -->
+            <!--
+            <div class="border-b border-gray-700">
+                <div class="p-3 bg-gray-800/50">
+                    <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.5 1.5H5.75A2.25 2.25 0 003.5 3.75v12.5A2.25 2.25 0 005.75 18.5h8.5a2.25 2.25 0 002.25-2.25V9.5"/>
+                        </svg>
+                        Meus Grupos
+                    </h4>
+                </div>
+                <div id="groups-list-dropdown" class="max-h-40 overflow-y-auto">
+                    <button id="create-group-quick" class="w-full text-left px-3 py-2 text-sm text-cyan-400 hover:bg-purple-900/30 flex items-center gap-2">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd" />
+                        </svg>
+                        + Novo Grupo
+                    </button>
+                    <div id="navbar-groups-container" class="space-y-1">
+                        <!-- Carregado dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            -->
             
             <div class="p-4 border-b border-gray-700 space-y-3">
                 <h4 class="text-sm font-semibold text-gray-400 mb-2">Notificações Email</h4>
@@ -82,6 +104,28 @@
                     </div>
                 </label>
             </div>
+            
+            <div class="p-4 border-b border-gray-700 space-y-3">
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Notificações WhatsApp (Meta API)</h4>
+                <label for="toggle-whatsapp" class="flex items-center justify-between cursor-pointer">
+                    <span class="text-gray-300">Receber via WhatsApp</span>
+                    <div class="relative">
+                        <input type="checkbox" id="toggle-whatsapp" class="sr-only toggle-checkbox" data-setting="notifyViaWhatsApp">
+                        <div class="toggle-bg bg-gray-600 border-2 border-gray-600 h-6 w-11 rounded-full"></div>
+                        <div class="toggle-dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform"></div>
+                    </div>
+                </label>
+                
+                <div class="mt-2">
+                    <label for="whatsapp-number-confirm" class="block text-sm font-medium mb-1 text-gray-400">Seu Nº WhatsApp (com + DDI):</label>
+                    <input type="tel" id="whatsapp-number-confirm" placeholder="+5519999998888" class="modal-input w-full p-2 rounded text-sm" data-setting="whatsappNumber">
+                    <small class="text-xs text-gray-500 mt-1 block">Confirme seu número após configurar.</small>
+                </div>
+                
+                <!-- Meta WhatsApp API Configuration -->
+                <?php include __DIR__ . '/whatsapp-config.php'; ?>
+            </div>
+            
             <div class="p-2">
                 <button id="logout-button" class="w-full text-center p-2 rounded hover:bg-red-700/50 text-red-400 transition-colors">Sair</button>
             </div>
@@ -89,3 +133,12 @@
     </div>
 </header>
 <?php endif; ?>
+
+<!-- 
+    IMPORTANTE: Se quiser adicionar a lista de grupos, descomente a seção acima
+    E adicione ao final do dashboard.php:
+    
+    <script src="<?php echo url('assets/js/groups-navbar.js'); ?>"></script>
+    
+    Ou use o código de groups-navbar.js como referência
+-->
