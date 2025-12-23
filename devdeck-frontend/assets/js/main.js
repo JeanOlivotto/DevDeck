@@ -123,6 +123,13 @@ async function fetchApi(endpoint, options = {}, requireAuth = true) {
         
         if (!response.ok) {
             if (response.status === 401 && requireAuth) {
+                // Limpar sessão PHP também
+                fetch(BASE_PATH + '/api/logout.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=logout'
+                }).catch(() => {});
+                
                 clearAuthData();
                 window.location.href = BASE_PATH + '/index.php';
                 throw new Error('Sessão inválida. Faça login novamente.');

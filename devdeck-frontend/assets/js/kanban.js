@@ -146,8 +146,22 @@ function generateAvatarColor(seed) {
 }
 
 async function handleLogout() {
+    try {
+        // Limpar sessão PHP
+        await fetch(BASE_PATH + '/api/logout.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=logout'
+        }).catch(e => console.warn('Logout PHP warning:', e));
+    } catch (e) {
+        console.warn('Erro ao limpar sessão:', e);
+    }
+    
+    // Limpar localStorage e desconectar Pusher
     DevDeck.clearAuthData();
     disconnectPusher();
+    
+    // Redirecionar para login
     window.location.href = BASE_PATH + '/index.php';
 }
 
