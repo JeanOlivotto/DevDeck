@@ -1,0 +1,153 @@
+┌─────────────────────────────────────────────────────────────────────┐
+│                     DevDeck - Arquitetura Frontend                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                           CAMADA PHP                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐      │
+│  │  index.php   │     │ signup.php   │     │dashboard.php │      │
+│  │   (Login)    │────▶│  (Cadastro)  │────▶│   (Kanban)   │      │
+│  └──────────────┘     └──────────────┘     └──────────────┘      │
+│         │                    │                      │              │
+│         └────────────────────┴──────────────────────┘              │
+│                              │                                     │
+│                    ┌─────────▼──────────┐                         │
+│                    │  config/config.php  │                         │
+│                    │  (Sessão, Funções) │                         │
+│                    └────────────────────┘                         │
+│                              │                                     │
+│         ┌────────────────────┼────────────────────┐               │
+│         │                    │                    │               │
+│    ┌────▼─────┐         ┌───▼────┐          ┌───▼────┐          │
+│    │ header.php│         │navbar.php│         │modals.php│         │
+│    └──────────┘         └─────────┘          └────────┘          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      CAMADA JAVASCRIPT                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│                    ┌─────────────────────┐                         │
+│                    │     main.js         │                         │
+│                    │  (Core Global)      │                         │
+│                    │  window.DevDeck     │                         │
+│                    └──────────┬──────────┘                         │
+│                               │                                     │
+│        ┌──────────────────────┼──────────────────────┐            │
+│        │                      │                      │            │
+│   ┌────▼─────┐         ┌─────▼──────┐         ┌────▼─────┐      │
+│   │ auth.js  │         │ kanban.js  │         │settings.js│      │
+│   │(Login/   │         │  (Core     │         │(Config/   │      │
+│   │Signup)   │         │  Kanban)   │         │WhatsApp)  │      │
+│   └──────────┘         └─────┬──────┘         └──────────┘      │
+│                              │                                     │
+│                        ┌─────▼──────┐                             │
+│                        │kanban-     │                             │
+│                        │modals.js   │                             │
+│                        │(D&D, CRUD) │                             │
+│                        └────────────┘                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                          COMUNICAÇÃO                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   JavaScript ──────▶ PHP Session ──────▶ API Backend              │
+│       │                   │                    │                    │
+│       │                   │                    │                    │
+│   LocalStorage      $_SESSION           REST API                   │
+│   - auth_token      - auth_token        - /auth/*                  │
+│   - user_email      - user_email        - /boards/*                │
+│   - user_name       - user_name         - /tasks/*                 │
+│                                         - /user/*                   │
+│                                                                     │
+│   Pusher (WebSocket) ◀──────────────── API Backend                │
+│   - Notificações em tempo real                                     │
+│   - Atualizações de tarefas                                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      FLUXO DE DADOS                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. Usuário acessa index.php                                       │
+│     └─▶ PHP verifica $_SESSION['auth_token']                      │
+│         ├─▶ Se logado: redirect para dashboard.php                │
+│         └─▶ Se não: mostra formulário de login                    │
+│                                                                     │
+│  2. Login (auth.js)                                                │
+│     └─▶ POST /api/auth/login                                      │
+│         └─▶ Recebe JWT token                                       │
+│             ├─▶ Salva em localStorage                             │
+│             ├─▶ Salva em $_SESSION (via PHP)                      │
+│             └─▶ Redirect para dashboard.php                       │
+│                                                                     │
+│  3. Dashboard (kanban.js)                                          │
+│     ├─▶ Carrega boards (GET /api/boards)                          │
+│     ├─▶ Carrega tasks (GET /api/tasks?boardId=X)                  │
+│     ├─▶ Conecta Pusher (WebSocket)                                │
+│     └─▶ Renderiza Kanban                                          │
+│                                                                     │
+│  4. Interações (kanban-modals.js)                                  │
+│     ├─▶ Criar tarefa: POST /api/tasks                             │
+│     ├─▶ Atualizar: PATCH /api/tasks/:id                           │
+│     ├─▶ Deletar: DELETE /api/tasks/:id                            │
+│     └─▶ Drag & Drop: PATCH /api/tasks/:id (status)                │
+│                                                                     │
+│  5. Configurações (kanban-settings.js)                             │
+│     ├─▶ Notificações: PATCH /api/user/settings                    │
+│     ├─▶ WhatsApp Meta: POST /api/whatsapp-meta/*                  │
+│     └─▶ Pusher events: task_*, board_*                            │
+│                                                                     │
+│  6. Logout                                                          │
+│     └─▶ Limpa localStorage + $_SESSION                            │
+│         └─▶ Redirect para index.php                               │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                   COMPARAÇÃO: ANTES vs DEPOIS                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ANTES (Monolítico):                                               │
+│  ┌─────────────────────┐                                           │
+│  │    index.html       │  ◀── Tudo em um arquivo                  │
+│  │  (500+ linhas HTML) │                                           │
+│  │                     │                                           │
+│  │  + script.js        │  ◀── 1122 linhas JS                      │
+│  │  + style.css        │  ◀── 311 linhas CSS                      │
+│  └─────────────────────┘                                           │
+│                                                                     │
+│  DEPOIS (Modular):                                                 │
+│  ┌─────────────────────┐                                           │
+│  │   index.php         │  ◀── Login (50 linhas)                   │
+│  │   views/signup.php  │  ◀── Cadastro (60 linhas)                │
+│  │   views/dashboard.php│ ◀── Kanban (70 linhas)                  │
+│  ├─────────────────────┤                                           │
+│  │   components/       │  ◀── 5 componentes reutilizáveis         │
+│  │   - navbar.php      │                                           │
+│  │   - modals.php      │                                           │
+│  │   - loading.php     │                                           │
+│  │   - whatsapp-*.php  │                                           │
+│  ├─────────────────────┤                                           │
+│  │   assets/js/        │  ◀── 5 módulos JS (~880 linhas)          │
+│  │   - main.js         │                                           │
+│  │   - auth.js         │                                           │
+│  │   - kanban.js       │                                           │
+│  │   - kanban-modals.js│                                           │
+│  │   - kanban-settings.js                                          │
+│  └─────────────────────┘                                           │
+│                                                                     │
+│  Benefícios:                                                        │
+│  ✅ Código mais limpo e organizado                                │
+│  ✅ Fácil manutenção                                               │
+│  ✅ Carregamento otimizado (só o necessário)                      │
+│  ✅ Melhor performance                                             │
+│  ✅ Escalável                                                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
