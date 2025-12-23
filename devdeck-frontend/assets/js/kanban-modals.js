@@ -50,7 +50,7 @@ async function handleTaskDrop(e) {
         const newStatus = this.closest('.column').dataset.status;
         
         try {
-            await DevDeck.fetchApi(`/boards/${currentBoardId}/tasks/${taskId}`, {
+            await DevDeck.fetchApi(`/tasks/${taskId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status: newStatus })
             });
@@ -176,15 +176,15 @@ async function handleTaskSubmit(e) {
     try {
         if (taskId) {
             // Atualizar tarefa existente
-            await DevDeck.fetchApi(`/boards/${currentBoardId}/tasks/${taskId}`, {
+            await DevDeck.fetchApi(`/tasks/${taskId}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ title, description, status })
+                body: JSON.stringify({ title, description, status, boardId: currentBoardId })
             });
         } else {
             // Criar nova tarefa
-            await DevDeck.fetchApi(`/boards/${currentBoardId}/tasks`, {
+            await DevDeck.fetchApi('/tasks', {
                 method: 'POST',
-                body: JSON.stringify({ title, description, status })
+                body: JSON.stringify({ title, description, status, boardId: currentBoardId })
             });
         }
         
@@ -208,7 +208,7 @@ async function handleDeleteTask() {
     if (!confirmed) return;
     
     try {
-        await DevDeck.fetchApi(`/boards/${currentBoardId}/tasks/${taskId}`, {
+        await DevDeck.fetchApi(`/tasks/${taskId}`, {
             method: 'DELETE'
         });
         

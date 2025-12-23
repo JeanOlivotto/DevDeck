@@ -253,7 +253,7 @@ async function selectBoard(boardId) {
 
 async function loadTasks(boardId) {
     try {
-        const tasks = await DevDeck.fetchApi(`/boards/${boardId}/tasks`);
+        const tasks = await DevDeck.fetchApi(`/tasks?boardId=${boardId}`);
         renderTasks(tasks);
         
         if (noBoardsMessage) noBoardsMessage.classList.add('hidden');
