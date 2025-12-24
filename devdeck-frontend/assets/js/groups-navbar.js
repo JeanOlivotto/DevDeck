@@ -48,7 +48,7 @@ function renderGroupsListDropdown() {
             </button>
             
             <!-- Menu dropdown do grupo -->
-            <div class="absolute left-full top-0 ml-1 bg-[#23284a] rounded-lg shadow-lg border border-gray-700 hidden group-item-menu w-32 z-50">
+            <div class="absolute left-0 top-full mt-1 bg-[#23284a] rounded-lg shadow-lg border border-gray-700 hidden group-item-menu w-32 z-50">
                 <button class="group-edit-btn w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-purple-900/30 flex items-center gap-2 first:rounded-t-lg transition-colors" data-group-id="${group.id}">
                     <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
@@ -75,9 +75,13 @@ function renderGroupsListDropdown() {
         const groupButton = groupElement.querySelector('.group-item-button');
         const menu = groupElement.querySelector('.group-item-menu');
         
-        // Toggle menu
+        // Toggle menu (fechar outros antes de abrir)
         groupButton.addEventListener('click', function(e) {
             e.stopPropagation();
+            // Fechar quaisquer outros menus abertos
+            document.querySelectorAll('.group-item-menu').forEach(m => {
+                if (m !== menu) m.classList.add('hidden');
+            });
             menu.classList.toggle('hidden');
         });
         
