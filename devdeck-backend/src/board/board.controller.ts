@@ -1,92 +1,74 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// src/board/board.controller.ts
 import {
   Controller,
   Get,
   Post,
   Body,
-  Param,
-  ParseIntPipe,
-  HttpCode,
-  HttpStatus,
   Patch,
+  Param,
   Delete,
   UseGuards,
-  Req,
   Query,
-  BadRequestException,
+  Req,
+  ParseIntPipe,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { BoardService } from './board.service';
-import {
-  CreateBoardDto,
-  UpdateBoardDto,
-  ReorderBoardsDto,
-} from './dto/board.dto';
+import { CreateBoardDto, UpdateBoardDto } from './dto/board.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('boards')
-@UseGuards(JwtAuthGuard)
 export class BoardController {
   constructor(private readonly boardService: BoardService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() createBoardDto: CreateBoardDto, @Req() req) {
-    const userId = req.user.userId;
-    // CORREÇÃO: Passar userId como segundo argumento
-    return this.boardService.create(createBoardDto, userId); // <--- CORRIGIDO
+  create(@Req() req, @Body() createBoardDto: CreateBoardDto) {
+    return this.boardService.create(req.user.userId, createBoardDto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(@Req() req, @Query('groupId') groupId?: string) {
-    const userId = req.user.userId;
-    let groupIdNum: number | undefined = undefined;
-
-    if (groupId !== undefined) {
-      // Handle special case for "personal" filter
-      if (groupId === 'personal') {
-        groupIdNum = -1; // Special marker for personal boards only
-      } else {
-        groupIdNum = parseInt(groupId, 10);
-        if (isNaN(groupIdNum)) {
-          throw new BadRequestException('groupId deve ser um número válido');
-        }
-      }
-    }
-
-    return this.boardService.findAll(userId, groupIdNum);
+    const parsedGroupId = groupId ? parseInt(groupId) : undefined;
+    return this.boardService.findAll(req.user.userId, parsedGroupId);
   }
 
-  @Patch('reorder')
-  @HttpCode(HttpStatus.OK)
-  reorder(@Body() reorderBoardsDto: ReorderBoardsDto, @Req() req) {
-    const userId = req.user.userId;
-    return this.boardService.reorderBoards(reorderBoardsDto, userId);
+  // ROTA PÚBLICA (Sem Guard): Obter dados do board pelo token
+  @Get('public/:token')
+  async getPublicBoardInfo(@Param('token') token: string) {
+    return this.boardService.findByPublicToken(token);
   }
 
-  // findOne, update, remove já estavam corretos, passando userId
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number, @Req() req) {
-    const userId = req.user.userId;
-    return this.boardService.findOne(id, userId);
+  findOne(@Param('id') id: string, @Req() req) {
+    return this.boardService.findOne(+id, req.user.userId);
   }
 
-  @Patch(':id')
-  update(
+  // ROTA PROTEGIDA: Ativar/Desativar Tickets
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/public-toggle')
+  async togglePublic(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateBoardDto: UpdateBoardDto,
+    @Body('isPublic', ParseBoolPipe) isPublic: boolean,
     @Req() req,
   ) {
-    const userId = req.user.userId;
-    return this.boardService.update(id, updateBoardDto, userId);
+    return this.boardService.togglePublic(id, req.user.userId, isPublic);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Req() req,
+    @Body() updateBoardDto: UpdateBoardDto,
+  ) {
+    return this.boardService.update(+id, req.user.userId, updateBoardDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
-    const userId = req.user.userId;
-    return this.boardService.remove(id, userId);
+  remove(@Param('id') id: string, @Req() req) {
+    return this.boardService.remove(+id, req.user.userId);
   }
 }

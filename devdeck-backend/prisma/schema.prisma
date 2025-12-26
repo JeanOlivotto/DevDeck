@@ -16,6 +16,7 @@ model User {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   notifyDailySummary Boolean       @default(true)
+  notificationDays   String?       @db.VarChar(255)
   notifyStaleTasks   Boolean       @default(true)
   boards             Board[]
   groupMembers       GroupMember[]
@@ -26,17 +27,19 @@ model User {
 }
 
 model Board {
-  id        Int      @id @default(autoincrement())
-  name      String
-  order     Int      @default(0)
-  type      String   @default("personal")
-  userId    Int?
-  groupId   Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  group     Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks     Task[]
+  id                  Int      @id @default(autoincrement())
+  name                String
+  order               Int      @default(0)
+  type                String   @default("personal")
+  userId              Int?
+  groupId             Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  isPublicTicketBoard Boolean  @default(false)
+  publicToken         String?  @unique
+  group               Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks               Task[]
 
   @@unique([name, userId, groupId])
   @@index([userId], map: "boards_userId_fkey")
@@ -85,6 +88,13 @@ model Task {
   updatedAt      DateTime  @updatedAt
   boardId        Int
   assignedUserId Int?
+  priority       String    @default("MEDIUM")
+  estimatedTime  Int?
+  dueDate        DateTime?
+  tags           String?
+  isTicket       Boolean   @default(false)
+  requesterName  String?
+  requesterEmail String?
   subtasks       Subtask[]
   assignedUser   User?     @relation(fields: [assignedUserId], references: [id])
   board          Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)

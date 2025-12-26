@@ -1,167 +1,89 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   NotFoundException,
-  OnModuleInit,
-  Logger,
-  ConflictException,
-  BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  CreateBoardDto,
-  UpdateBoardDto,
-  ReorderBoardsDto,
-} from './dto/board.dto';
-import { Prisma } from '@prisma/client';
+import { CreateBoardDto, UpdateBoardDto } from './dto/board.dto';
+import { randomBytes } from 'crypto';
 
 @Injectable()
-export class BoardService implements OnModuleInit {
-  private readonly logger = new Logger(BoardService.name);
-  private readonly defaultBoards = [
-    'Tasks Pendentes',
-    'Novas Ideias',
-    'Alinhamento com Cliente',
-  ];
+export class BoardService {
+  constructor(private prisma: PrismaService) {}
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    // Você pode deixar em branco se não quiser inicializar boards padrão
-  }
-
-  /**
-   * Criar novo board (personal ou group)
-   */
-  async create(createBoardDto: CreateBoardDto, userId: number) {
-    try {
-      const boardData: any = {
-        name: createBoardDto.name,
-        type: createBoardDto.type || 'personal',
-      };
-
-      // Se type é 'group', groupId é obrigatório
-      if (boardData.type === 'group') {
-        if (!createBoardDto.groupId) {
-          throw new BadRequestException(
-            'groupId é obrigatório para criar um quadro de grupo',
-          );
-        }
-
-        // Verificar se o usuário é membro do grupo
-        const groupMember = await this.prisma.groupMember.findUnique({
-          where: {
-            groupId_userId: {
-              groupId: createBoardDto.groupId,
-              userId: userId,
-            },
-          },
-        });
-
-        if (!groupMember || groupMember.inviteStatus !== 'accepted') {
-          throw new ForbiddenException('Você não é membro deste grupo');
-        }
-
-        boardData.groupId = createBoardDto.groupId;
-      } else {
-        // Personal board
-        boardData.userId = userId;
-      }
-
-      return await this.prisma.board.create({
-        data: boardData,
+  async create(userId: number, createBoardDto: CreateBoardDto) {
+    if (createBoardDto.groupId) {
+      const groupMember = await this.prisma.groupMember.findFirst({
+        where: {
+          groupId: createBoardDto.groupId,
+          userId: userId,
+          role: 'admin',
+        },
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          `Você já possui um quadro com o nome '${createBoardDto.name}'.`,
+
+      if (!groupMember) {
+        throw new ForbiddenException(
+          'Apenas admins podem criar quadros neste grupo.',
         );
       }
-      this.logger.error('Erro ao criar quadro:', error);
-      throw error;
-    }
-  }
 
-  /**
-   * Listar boards (personal + grupos)
-   */
-  async findAll(userId: number, groupId?: number) {
-    const where: any = {};
-
-    if (groupId === -1) {
-      // Special case: return only personal boards
-      where.userId = userId;
-    } else if (groupId) {
-      // Se groupId fornecido, retorna apenas boards do grupo
-      where.groupId = groupId;
-
-      // Verificar se user é membro do grupo
-      const groupMember = await this.prisma.groupMember.findUnique({
-        where: {
-          groupId_userId: {
-            groupId,
-            userId,
-          },
+      return this.prisma.board.create({
+        data: {
+          name: createBoardDto.name,
+          type: 'group',
+          groupId: createBoardDto.groupId,
         },
       });
-
-      if (!groupMember || groupMember.inviteStatus !== 'accepted') {
-        throw new ForbiddenException('Você não é membro deste grupo');
-      }
-    } else {
-      // Se sem groupId, retorna boards pessoais + de grupos onde user é membro
-      where.OR = [
-        { userId: userId },
-        {
-          group: {
-            members: {
-              some: {
-                userId: userId,
-                inviteStatus: 'accepted',
-              },
-            },
-          },
-        },
-      ];
     }
 
-    return await this.prisma.board.findMany({
-      where,
-      include: { tasks: { orderBy: { createdAt: 'asc' } } },
+    return this.prisma.board.create({
+      data: {
+        name: createBoardDto.name,
+        type: 'personal',
+        userId: userId,
+      },
+    });
+  }
+
+  async findAll(userId: number, groupId?: number) {
+    if (groupId) {
+      const isMember = await this.prisma.groupMember.findFirst({
+        where: { groupId, userId, inviteStatus: 'accepted' },
+      });
+
+      if (!isMember) {
+        throw new ForbiddenException('Você não tem acesso a este grupo.');
+      }
+
+      return this.prisma.board.findMany({
+        where: { groupId },
+        orderBy: { order: 'asc' },
+      });
+    }
+
+    return this.prisma.board.findMany({
+      where: { userId, type: 'personal' },
       orderBy: { order: 'asc' },
     });
   }
 
-  /**
-   * Obter um board específico (personal ou grupo)
-   */
   async findOne(id: number, userId: number) {
     const board = await this.prisma.board.findUnique({
       where: { id },
-      include: {
-        tasks: { orderBy: { createdAt: 'asc' } },
-        group: { include: { members: true } },
-      },
+      include: { group: { include: { members: true } } },
     });
 
     if (!board) {
-      throw new NotFoundException(`Quadro com ID ${id} não encontrado.`);
+      throw new NotFoundException(`Board com ID ${id} não encontrado.`);
     }
 
-    // Verificar acesso
     if (board.type === 'personal') {
       if (board.userId !== userId) {
-        throw new ForbiddenException(
-          'Você não tem permissão para acessar este quadro.',
-        );
+        throw new ForbiddenException('Acesso negado a este quadro pessoal.');
       }
-    } else if (board.type === 'group') {
+    } else {
+      // CORREÇÃO: Adicionado '?' para evitar erro se group for null
       const isMember = board.group?.members.some(
         (m) => m.userId === userId && m.inviteStatus === 'accepted',
       );
@@ -173,97 +95,63 @@ export class BoardService implements OnModuleInit {
     return board;
   }
 
-  /**
-   * Atualizar um board
-   */
-  async update(id: number, updateBoardDto: UpdateBoardDto, userId: number) {
-    const board = await this.findOne(id, userId);
-
-    if (!updateBoardDto.name) {
-      throw new BadRequestException('Nenhum dado fornecido para atualização.');
-    }
-
-    try {
-      return await this.prisma.board.update({
-        where: { id },
-        data: { name: updateBoardDto.name },
-        include: { tasks: { orderBy: { createdAt: 'asc' } } },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Um quadro com este nome já existe.');
-      }
-      this.logger.error(`Erro ao atualizar quadro ${id}:`, error);
-      throw error;
-    }
+  async update(id: number, userId: number, updateBoardDto: UpdateBoardDto) {
+    await this.findOne(id, userId);
+    return this.prisma.board.update({
+      where: { id },
+      data: updateBoardDto,
+    });
   }
 
-  /**
-   * Deletar um board
-   */
   async remove(id: number, userId: number) {
     await this.findOne(id, userId);
-
-    try {
-      await this.prisma.board.delete({
-        where: { id },
-      });
-      this.logger.log(
-        `Quadro com ID ${id} excluído com sucesso pelo usuário ${userId}.`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Erro ao remover quadro ${id} pelo usuário ${userId}:`,
-        error,
-      );
-      throw error;
-    }
+    return this.prisma.board.delete({
+      where: { id },
+    });
   }
 
-  /**
-   * Reordenar boards (personal ou grupo)
-   */
-  async reorderBoards(reorderDto: ReorderBoardsDto, userId: number) {
-    // Verifica se todos os quadros pertencem ao usuário (personal) ou grupos que é membro
-    const boardIds = reorderDto.boards.map((b) => b.id);
-    const boards = await this.prisma.board.findMany({
-      where: {
-        id: { in: boardIds },
-      },
-      include: { group: { include: { members: true } } },
-    });
+  // --- TICKET PÚBLICO ---
 
-    // Validar acesso para cada board
-    for (const board of boards) {
-      if (board.type === 'personal' && board.userId !== userId) {
-        throw new ForbiddenException(
-          'Você não tem permissão para reordenar este quadro pessoal.',
-        );
-      }
-      if (board.type === 'group') {
-        const isMember = board.group?.members.some(
-          (m) => m.userId === userId && m.inviteStatus === 'accepted',
-        );
-        if (!isMember) {
-          throw new ForbiddenException('Você não é membro deste grupo.');
-        }
-      }
+  async togglePublic(boardId: number, userId: number, isPublic: boolean) {
+    const board = await this.findOne(boardId, userId);
+
+    let token = board.publicToken;
+
+    if (isPublic && !token) {
+      token = randomBytes(16).toString('hex');
     }
 
-    // Atualiza a ordem de cada quadro
-    const updatePromises = reorderDto.boards.map((board) =>
-      this.prisma.board.update({
-        where: { id: board.id },
-        data: { order: board.order },
-      }),
-    );
+    return this.prisma.board.update({
+      where: { id: boardId },
+      data: {
+        isPublicTicketBoard: isPublic,
+        publicToken: isPublic ? token : board.publicToken,
+      },
+    });
+  }
 
-    await Promise.all(updatePromises);
+  async findByPublicToken(token: string) {
+    const board = await this.prisma.board.findUnique({
+      where: { publicToken: token },
+      include: {
+        group: { select: { name: true } },
+        user: { select: { name: true } },
+      },
+    });
 
-    // Retorna os quadros atualizados
-    return await this.findAll(userId);
+    if (!board || !board.isPublicTicketBoard) {
+      throw new NotFoundException(
+        'Este quadro de tickets não existe ou foi desativado.',
+      );
+    }
+
+    return {
+      id: board.id,
+      name: board.name,
+      // CORREÇÃO: Adicionado '?' para segurança
+      ownerName: board.type === 'group' ? board.group?.name : board.user?.name,
+      type: board.type,
+      description: 'Central de Suporte',
+    };
   }
 }

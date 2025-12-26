@@ -11,20 +11,31 @@ async function loadUserSettings() {
                 currentUserSettings = {
                     notifyDailySummary: user.notifyDailySummary,
                     notifyStaleTasks: user.notifyStaleTasks,
-                    discordWebhook: user.discordWebhook
+                    discordWebhook: user.discordWebhook,
+                    notificationDays: user.notificationDays // Novo campo
                 };
             }
 
-            // Tenta preencher a UI (suporta IDs novos e antigos para compatibilidade)
-            setInputValue('settings-notify-daily', user.notifyDailySummary, true); // Novo ID
-            setInputValue('toggle-daily-summary', user.notifyDailySummary, true); // Antigo ID
+            // 1. Toggles de Notificação (Suporta IDs novos e antigos)
+            setInputValue('settings-notify-daily', user.notifyDailySummary, true);
+            setInputValue('toggle-daily-summary', user.notifyDailySummary, true);
             
             setInputValue('settings-notify-stale', user.notifyStaleTasks, true);
             setInputValue('toggle-stale-tasks', user.notifyStaleTasks, true);
 
+            // 2. Campo do Discord
             setInputValue('settings-discord-webhook', user.discordWebhook || '');
             
-            // Se existirem funções de UI antigas sendo chamadas, garantimos que não quebrem
+            // 3. Dias da Semana (NOVO)
+            // Se não tiver nada salvo, assume padrão "1,2,3,4,5" (Seg-Sex)
+            const savedDays = (user.notificationDays || "1,2,3,4,5").split(',');
+            
+            document.querySelectorAll('.day-checkbox').forEach(chk => {
+                // Marca o checkbox se o valor dele estiver na lista salva
+                chk.checked = savedDays.includes(chk.value);
+            });
+
+            // Compatibilidade com funções legadas (se existirem)
             if (typeof updateToggleUI === 'function') updateToggleUI();
         }
     } catch (error) {
@@ -95,7 +106,14 @@ function setupSettingsListeners() {
 function getInputValue(id, isCheckbox = false) {
     const el = document.getElementById(id);
     if (!el) return isCheckbox ? false : null;
-    return isCheckbox ? el.checked : el.value.trim();
+    
+    if (isCheckbox) {
+        return el.checked;
+    } else {
+        // CORREÇÃO: Se estiver vazio, retorna null para não dar erro de URL inválida
+        const val = el.value.trim();
+        return val === '' ? null : val;
+    }
 }
 
 // Função unificada de salvamento

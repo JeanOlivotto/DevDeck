@@ -1,4 +1,3 @@
-// src/task/task.controller.ts
 import {
   Controller,
   Get,
@@ -7,9 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  ParseIntPipe,
-  HttpCode,
-  HttpStatus,
   Query,
   UseGuards,
   Req,
@@ -20,99 +16,80 @@ import {
   UpdateTaskDto,
   CreateSubtaskDto,
   UpdateSubtaskDto,
+  CreateTicketDto,
 } from './dto/task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('tasks')
-@UseGuards(JwtAuthGuard)
 export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() createTaskDto: CreateTaskDto, @Req() req) {
-    // <-- req já estava no lugar certo
-    const userId = req.user.userId;
-    return this.taskService.create(createTaskDto, userId);
+  create(@Req() req, @Body() createTaskDto: CreateTaskDto) {
+    return this.taskService.create(createTaskDto, req.user.userId);
   }
 
-  @Get()
-  // CORREÇÃO: Inverter a ordem de @Req e @Query
-  findAll(@Req() req, @Query('boardId') boardId?: string) {
-    // <--- CORRIGIDO
-    const userId = req.user.userId;
-    let boardIdNum: number | undefined = undefined;
-
-    if (boardId !== undefined) {
-      boardIdNum = parseInt(boardId, 10);
-      if (isNaN(boardIdNum)) {
-        return [];
-      }
-    }
-    // A chamada ao serviço já estava correta
-    return this.taskService.findAll(userId, boardIdNum);
-  }
-
-  // findOne, update, remove já estavam corretos
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number, @Req() req) {
-    const userId = req.user.userId;
-    return this.taskService.findOne(id, userId);
-  }
-
-  @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateTaskDto: UpdateTaskDto,
-    @Req() req,
+  // ROTA PÚBLICA: Criar Ticket (Sem Guard)
+  // POST /tasks/ticket/TOKEN_DO_BOARD
+  @Post('ticket/:token')
+  async createTicket(
+    @Param('token') token: string,
+    @Body() createTicketDto: CreateTicketDto,
   ) {
-    const userId = req.user.userId;
-    return this.taskService.update(id, updateTaskDto, userId);
+    return this.taskService.createPublicTicket(token, createTicketDto);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  findAll(@Query('boardId') boardId: string) {
+    return this.taskService.findAll(+boardId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.taskService.findOne(+id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
+    return this.taskService.update(+id, updateTaskDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
-    const userId = req.user.userId;
-    return this.taskService.remove(id, userId);
+  remove(@Param('id') id: string) {
+    return this.taskService.remove(+id);
   }
 
   // Subtasks
+  @UseGuards(JwtAuthGuard)
   @Post(':id/subtasks')
-  @HttpCode(HttpStatus.CREATED)
   createSubtask(
-    @Param('id', ParseIntPipe) taskId: number,
+    @Param('id') id: string,
     @Body() createSubtaskDto: CreateSubtaskDto,
-    @Req() req,
   ) {
-    const userId = req.user.userId;
-    return this.taskService.createSubtask(taskId, createSubtaskDto, userId);
+    return this.taskService.createSubtask(+id, createSubtaskDto);
   }
 
-  @Patch(':taskId/subtasks/:subtaskId')
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/subtasks/:subtaskId')
   updateSubtask(
-    @Param('taskId', ParseIntPipe) taskId: number,
-    @Param('subtaskId', ParseIntPipe) subtaskId: number,
+    @Param('id') id: string,
+    @Param('subtaskId') subtaskId: string,
     @Body() updateSubtaskDto: UpdateSubtaskDto,
-    @Req() req,
   ) {
-    const userId = req.user.userId;
-    return this.taskService.updateSubtask(
-      taskId,
-      subtaskId,
-      updateSubtaskDto,
-      userId,
-    );
+    return this.taskService.updateSubtask(+id, +subtaskId, updateSubtaskDto);
   }
 
-  @Delete(':taskId/subtasks/:subtaskId')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/subtasks/:subtaskId')
   removeSubtask(
-    @Param('taskId', ParseIntPipe) taskId: number,
-    @Param('subtaskId', ParseIntPipe) subtaskId: number,
-    @Req() req,
+    @Param('id') id: string,
+    @Param('subtaskId') subtaskId: string,
   ) {
-    const userId = req.user.userId;
-    return this.taskService.removeSubtask(taskId, subtaskId, userId);
+    return this.taskService.removeSubtask(+id, +subtaskId);
   }
 }

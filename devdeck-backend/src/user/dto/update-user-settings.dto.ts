@@ -12,5 +12,9 @@ export class UpdateUserSettingsDto {
   @IsString()
   @IsUrl({}, { message: 'A URL do Webhook do Discord é inválida.' })
   @IsOptional()
-  discordWebhook?: string; // Novo campo
+  discordWebhook?: string;
+
+  @IsString()
+  @IsOptional()
+  notificationDays?: string;
 }

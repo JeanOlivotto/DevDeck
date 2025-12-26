@@ -1,97 +1,141 @@
 import {
   IsNotEmpty,
   IsString,
-  MaxLength,
   IsOptional,
-  IsIn,
   IsInt,
-  Min,
+  IsEnum,
   IsBoolean,
+  IsDateString,
+  IsEmail,
 } from 'class-validator';
 
-// Status possíveis para uma tarefa
-export const TASK_STATUSES = ['TODO', 'DOING', 'DONE'] as const;
-export type TaskStatus = (typeof TASK_STATUSES)[number];
+// Enum para prioridade (opcional, mas bom para padronizar)
+export enum TaskPriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT',
+}
 
 export class CreateTaskDto {
-  @IsString({ message: 'O título deve ser uma string.' })
-  @IsNotEmpty({ message: 'O título não pode estar vazio.' })
-  @MaxLength(255, { message: 'O título não pode ter mais que 255 caracteres.' })
+  @IsString()
+  @IsNotEmpty()
   title: string;
 
-  @IsString({ message: 'A descrição deve ser uma string.' })
+  @IsString()
   @IsOptional()
-  @MaxLength(1000, {
-    message: 'A descrição não pode ter mais que 1000 caracteres.',
-  })
   description?: string;
 
-  @IsString({ message: 'O status deve ser uma string.' })
-  @IsNotEmpty({ message: 'O status não pode estar vazio.' })
-  @IsIn(TASK_STATUSES, {
-    message: `O status deve ser um dos seguintes: ${TASK_STATUSES.join(', ')}`,
-  })
-  status: TaskStatus = 'TODO'; // Default status
+  @IsString()
+  @IsOptional()
+  status?: string;
 
-  @IsInt({ message: 'O ID do quadro deve ser um número inteiro.' })
-  @Min(1, { message: 'O ID do quadro deve ser positivo.' })
-  @IsNotEmpty({ message: 'O ID do quadro é obrigatório.' })
+  @IsInt()
+  @IsNotEmpty() // boardId continua obrigatório para tarefas internas
   boardId: number;
+
+  // --- NOVOS CAMPOS ---
+  @IsEnum(TaskPriority)
+  @IsOptional()
+  priority?: string; // Default será MEDIUM no banco
+
+  @IsInt()
+  @IsOptional()
+  estimatedTime?: number; // Em minutos
+
+  @IsDateString()
+  @IsOptional()
+  dueDate?: string; // Data ISO 8601
+
+  @IsString()
+  @IsOptional()
+  tags?: string; // "bug,front,api"
+}
+
+// NOVO: DTO Exclusivo para Tickets Públicos (Não pede boardId, pede Token na URL)
+export class CreateTicketDto {
+  @IsString()
+  @IsNotEmpty({ message: 'O título é obrigatório.' })
+  title: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'A descrição é obrigatória.' })
+  description: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Seu nome é obrigatório.' })
+  requesterName: string;
+
+  @IsEmail({}, { message: 'Forneça um email válido para contato.' })
+  @IsNotEmpty()
+  requesterEmail: string;
+
+  // Prioridade opcional para o cliente (pode ser hidden no front ou não)
+  @IsEnum(TaskPriority)
+  @IsOptional()
+  priority?: string;
 }
 
 export class UpdateTaskDto {
-  @IsString({ message: 'O título deve ser uma string.' })
+  @IsString()
   @IsOptional()
-  @MaxLength(255, { message: 'O título não pode ter mais que 255 caracteres.' })
   title?: string;
 
-  @IsString({ message: 'A descrição deve ser uma string.' })
+  @IsString()
   @IsOptional()
-  @MaxLength(1000, {
-    message: 'A descrição não pode ter mais que 1000 caracteres.',
-  })
   description?: string;
 
-  @IsString({ message: 'O status deve ser uma string.' })
+  @IsString()
   @IsOptional()
-  @IsIn(TASK_STATUSES, {
-    message: `O status deve ser um dos seguintes: ${TASK_STATUSES.join(', ')}`,
-  })
-  status?: TaskStatus;
+  status?: string;
 
-  @IsInt({ message: 'O ID do quadro deve ser um número inteiro.' })
-  @Min(1, { message: 'O ID do quadro deve ser positivo.' })
-  @IsOptional() // Opcional ao atualizar, a menos que queira mover entre quadros
+  @IsInt()
+  @IsOptional()
+  order?: number;
+
+  @IsInt()
+  @IsOptional()
   boardId?: number;
 
-  @IsInt({ message: 'O ID do usuário deve ser um número inteiro.' })
-  @Min(1, { message: 'O ID do usuário deve ser positivo.' })
-  @IsOptional() // Opcional, pode ser null ou não incluído
-  assignedUserId?: number;
+  @IsInt()
+  @IsOptional()
+  assignedUserId?: number; // Para "Aceitar" o ticket
+
+  // --- NOVOS CAMPOS EM UPDATE ---
+  @IsEnum(TaskPriority)
+  @IsOptional()
+  priority?: string;
+
+  @IsInt()
+  @IsOptional()
+  estimatedTime?: number;
+
+  @IsDateString()
+  @IsOptional()
+  dueDate?: string;
+
+  @IsString()
+  @IsOptional()
+  tags?: string;
 }
 
+// Mantive Subtasks igual
 export class CreateSubtaskDto {
-  @IsString({ message: 'O título da subtarefa deve ser uma string.' })
-  @IsNotEmpty({ message: 'O título da subtarefa não pode estar vazio.' })
-  @MaxLength(255, {
-    message: 'O título da subtarefa não pode ter mais que 255 caracteres.',
-  })
+  @IsString()
+  @IsNotEmpty()
   title: string;
 
-  @IsBoolean({ message: 'O campo completed deve ser booleano.' })
+  @IsBoolean()
   @IsOptional()
   completed?: boolean;
 }
 
 export class UpdateSubtaskDto {
-  @IsString({ message: 'O título da subtarefa deve ser uma string.' })
+  @IsString()
   @IsOptional()
-  @MaxLength(255, {
-    message: 'O título da subtarefa não pode ter mais que 255 caracteres.',
-  })
   title?: string;
 
-  @IsBoolean({ message: 'O campo completed deve ser booleano.' })
+  @IsBoolean()
   @IsOptional()
   completed?: boolean;
 }

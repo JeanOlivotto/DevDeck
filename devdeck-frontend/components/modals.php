@@ -175,6 +175,55 @@
                 </div>
             </div>
 
+            <div class="mt-4 mb-4">
+                <span class="text-white font-medium block mb-2">Dias de Notificação</span>
+                <div class="flex justify-between gap-1" id="settings-days-container">
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="0" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            D
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="1" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            S
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="2" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            T
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="3" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            Q
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="4" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            Q
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="5" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            S
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="6" class="peer sr-only day-checkbox">
+                        <div class="w-8 h-8 rounded-full border border-gray-600 flex items-center justify-center text-gray-400 text-xs peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all hover:border-cyan-400">
+                            S
+                        </div>
+                    </label>
+                </div>
+                <p class="text-gray-500 text-xs mt-2">Escolha em quais dias receber alertas (Email e Discord).</p>
+            </div>
+
             <div class="border-t border-gray-700 pt-4">
                 <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <svg class="w-4 h-4 text-[#5865F2]" fill="currentColor" viewBox="0 0 24 24">
