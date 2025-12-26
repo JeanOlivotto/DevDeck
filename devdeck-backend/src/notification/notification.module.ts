@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { UserModule } from '../user/user.module';
 import { EmailModule } from '../email/email.module';
+import { DiscordModule } from 'src/discord/discord.module';
 @Module({
-  imports: [UserModule, EmailModule],
+  imports: [UserModule, EmailModule, DiscordModule],
   providers: [NotificationService],
 })
 export class NotificationModule {}

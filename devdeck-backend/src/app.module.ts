@@ -18,6 +18,7 @@ import { EncryptionService } from './encryption/encryption.service';
 import { PusherAuthController } from './pusher-auth/pusher-auth.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { GroupModule } from './group/group.module';
+import { DiscordModule } from './discord/discord.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { GroupModule } from './group/group.module';
     NotificationModule,
     EncryptionModule,
     GroupModule,
+    DiscordModule,
   ],
   controllers: [AuthController, UserController, PusherAuthController],
   providers: [

@@ -8,25 +8,19 @@ datasource db {
 }
 
 model User {
-  id                        Int           @id @default(autoincrement())
-  email                     String        @unique
-  name                      String
-  password                  String
-  whatsappNumber            String?
-  notifyViaWhatsApp         Boolean       @default(false)
-  whatsappSession           String?
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
-  notifyDailySummary        Boolean       @default(true)
-  notifyStaleTasks          Boolean       @default(true)
-  whatsappMetaPhoneNumberId String?
-  whatsappMetaAccessToken   String?
-  whatsappMessagesThisMonth Int           @default(0)
-  whatsappMonthResetDate    DateTime?
-  boards                    Board[]
-  groupMembers              GroupMember[]
-  groupsOwned               Group[]       @relation("groupOwner")
-  assignedTasks             Task[]
+  id                 Int           @id @default(autoincrement())
+  email              String        @unique
+  name               String
+  password           String
+  discordWebhook     String?       @db.VarChar(255)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  notifyDailySummary Boolean       @default(true)
+  notifyStaleTasks   Boolean       @default(true)
+  boards             Board[]
+  groupMembers       GroupMember[]
+  groupsOwned        Group[]       @relation("groupOwner")
+  assignedTasks      Task[]
 
   @@map("users")
 }
@@ -91,9 +85,9 @@ model Task {
   updatedAt      DateTime  @updatedAt
   boardId        Int
   assignedUserId Int?
-  board          Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  assignedUser   User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
   subtasks       Subtask[]
+  assignedUser   User?     @relation(fields: [assignedUserId], references: [id])
+  board          Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
 
   @@index([boardId], map: "tasks_boardId_fkey")
   @@index([assignedUserId], map: "tasks_assignedUserId_fkey")
@@ -107,8 +101,7 @@ model Subtask {
   taskId    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId], map: "subtasks_taskId_fkey")
   @@map("subtasks")

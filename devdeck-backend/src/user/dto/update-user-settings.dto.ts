@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class UpdateUserSettingsDto {
   @IsBoolean()
@@ -8,4 +8,9 @@ export class UpdateUserSettingsDto {
   @IsBoolean()
   @IsOptional()
   notifyStaleTasks?: boolean;
+
+  @IsString()
+  @IsUrl({}, { message: 'A URL do Webhook do Discord é inválida.' })
+  @IsOptional()
+  discordWebhook?: string; // Novo campo
 }

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma, User } from '@prisma/client'; // Importe User se precisar do tipo
+import { Prisma, User } from '@prisma/client';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 
 @Injectable()
@@ -18,11 +18,10 @@ export class UserService {
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
-    // Não lançamos NotFoundException aqui, pois pode ser usado para verificações
     return user;
   }
 
-  // Encontra um usuário pelo email (útil para login e verificação de cadastro)
+  // Encontra um usuário pelo email
   async findOneByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { email },
@@ -32,12 +31,12 @@ export class UserService {
   async updateSettings(
     userId: number,
     settings: UpdateUserSettingsDto,
-  ): Promise<Omit<User, 'password' | 'whatsappSession'>> {
-    // Omitir whatsappSession
+  ): Promise<Omit<User, 'password'>> {
     // Verifica se o usuário existe
     const userExists = await this.prisma.user.findUnique({
       where: { id: userId },
     });
+
     if (!userExists) {
       throw new NotFoundException(`Usuário com ID ${userId} não encontrado.`);
     }
@@ -45,10 +44,12 @@ export class UserService {
     try {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
-        data: settings, // Salva todas as configurações passadas
+        data: settings,
       });
+
+      // Remove a senha do retorno
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, whatsappSession, ...result } = updatedUser; // Remover whatsappSession da resposta
+      const { password, ...result } = updatedUser;
       return result;
     } catch (error) {
       this.logger.error(
@@ -60,13 +61,10 @@ export class UserService {
       );
     }
   }
+
   async create(data: Prisma.UserCreateInput): Promise<User> {
-    // A verificação se o email já existe geralmente é feita antes de chamar create,
-    // mas o Prisma lançará um erro P2002 se tentarmos criar com email duplicado.
     return this.prisma.user.create({
       data,
     });
   }
-
-  // Você pode adicionar outros métodos conforme necessário (ex: update, delete)
 }

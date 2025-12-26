@@ -35,7 +35,8 @@ if (function_exists('str_ends_with') ? str_ends_with($basePath, '/views') : subs
 define('BASE_PATH', $basePath);
 
 // Função helper para criar URLs corretas
-function url($path) {
+function url($path)
+{
     $path = ltrim($path, '/');
     if (BASE_PATH) {
         return BASE_PATH . '/' . $path;
@@ -45,53 +46,69 @@ function url($path) {
 
 // Iniciar sessão
 if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'lifetime' => 86400, // 1 dia
+        'path' => '/',       // Vale para todo o site
+        'domain' => '',      // Domínio atual
+        'secure' => false,   // Mude para true se usar HTTPS em produção
+        'httponly' => true,  // Segurança contra XSS
+        'samesite' => 'Lax'
+    ]);
     session_name(SESSION_NAME);
     session_start();
 }
 
 // Funções auxiliares
-function isLoggedIn() {
+function isLoggedIn()
+{
     return isset($_SESSION['auth_token']) && !empty($_SESSION['auth_token']);
 }
 
-function getAuthToken() {
+function getAuthToken()
+{
     return $_SESSION['auth_token'] ?? null;
 }
 
-function getUserEmail() {
+function getUserEmail()
+{
     return $_SESSION['user_email'] ?? null;
 }
 
-function getUserName() {
+function getUserName()
+{
     return $_SESSION['user_name'] ?? null;
 }
 
-function setAuthData($token, $email, $name) {
+function setAuthData($token, $email, $name)
+{
     $_SESSION['auth_token'] = $token;
     $_SESSION['user_email'] = $email;
     $_SESSION['user_name'] = $name;
 }
 
-function clearAuthData() {
+function clearAuthData()
+{
     unset($_SESSION['auth_token']);
     unset($_SESSION['user_email']);
     unset($_SESSION['user_name']);
     session_destroy();
 }
 
-function redirect($path) {
+function redirect($path)
+{
     header("Location: $path");
     exit;
 }
 
-function apiRequest($endpoint, $method = 'GET', $data = null, $requireAuth = true) {
+function apiRequest($endpoint, $method = 'GET', $data = null, $requireAuth = true)
+{
     $url = API_BASE_URL . $endpoint;
     $headers = ['Content-Type: application/json'];
-    
+
     if ($requireAuth && isLoggedIn()) {
         $headers[] = 'Authorization: Bearer ' . getAuthToken();
     }
-    
+
     $options = [
         'http' => [
             'method' => $method,
@@ -100,16 +117,16 @@ function apiRequest($endpoint, $method = 'GET', $data = null, $requireAuth = tru
             'ignore_errors' => true
         ]
     ];
-    
+
     $context = stream_context_create($options);
     $response = file_get_contents($url, false, $context);
-    
+
     $httpCode = 200;
     if (isset($http_response_header)) {
         preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $matches);
         $httpCode = intval($matches[1] ?? 200);
     }
-    
+
     return [
         'code' => $httpCode,
         'data' => json_decode($response, true)
