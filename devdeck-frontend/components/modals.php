@@ -106,3 +106,112 @@
         </form>
     </div>
 </div>
+
+<div id="settings-modal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-md transition-opacity" onclick="document.getElementById('settings-modal').classList.add('hidden')"></div>
+
+    <div class="modal-content relative p-8 rounded-2xl w-full max-w-xl mx-4 bg-[#15192b] border border-gray-700/50 shadow-2xl transform transition-all scale-100">
+
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-gradient-to-br from-cyan-600/20 to-blue-600/20 rounded-xl border border-cyan-500/30 shadow-lg shadow-cyan-900/20">
+                    <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-bold text-white tracking-tight">Preferências</h3>
+                    <p class="text-sm text-gray-400">Personalize suas notificações e alertas.</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="text-gray-500 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="space-y-6">
+            <div class="grid gap-4">
+                <div class="flex items-center justify-between p-4 bg-[#1e2336] rounded-xl border border-gray-700/50 hover:border-gray-600 transition-colors group">
+                    <div class="flex flex-col">
+                        <span class="text-gray-200 font-medium group-hover:text-white transition-colors">Resumo Diário</span>
+                        <span class="text-xs text-gray-500">Receba um email com suas tarefas do dia.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="settings-notify-daily" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 shadow-inner"></div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between p-4 bg-[#1e2336] rounded-xl border border-gray-700/50 hover:border-gray-600 transition-colors group">
+                    <div class="flex flex-col">
+                        <span class="text-gray-200 font-medium group-hover:text-white transition-colors">Alertas de Estagnação</span>
+                        <span class="text-xs text-gray-500">Avise quando tarefas ficarem paradas.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="settings-notify-stale" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 shadow-inner"></div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent my-2"></div>
+
+            <div class="bg-[#1e2336] rounded-xl border border-gray-700/50 p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-[#5865F2]" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419z" />
+                        </svg>
+                        <span class="text-gray-200 font-medium">Notificações via Discord</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="settings-enable-discord" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5865F2] shadow-inner"></div>
+                    </label>
+                </div>
+
+                <div id="discord-input-container" class="hidden transition-all duration-300 ease-in-out pl-2 border-l-2 border-[#5865F2]/30">
+                    <label for="settings-discord-webhook" class="block text-xs font-medium text-gray-400 mb-2 flex justify-between">
+                        WEBHOOK URL (Opcional)
+                        <a href="https://support.discord.com/hc/pt-br/articles/228383668-Usando-Webhooks" target="_blank" class="text-cyan-400 hover:underline flex items-center gap-1">
+                            Como pegar? <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                        </a>
+                    </label>
+                    <input type="text" id="settings-discord-webhook" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-[#15192b] border border-gray-600 rounded-lg p-3 text-white placeholder-gray-600 focus:border-[#5865F2] focus:ring-1 focus:ring-[#5865F2] focus:outline-none text-sm shadow-inner">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-4">Dias de Notificação</label>
+                <div class="flex flex-wrap gap-3 justify-between">
+                    <?php
+                    $days = [0 => 'Dom', 1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'Sáb'];
+                    foreach ($days as $val => $label): ?>
+                        <label class="cursor-pointer group relative">
+                            <input type="checkbox" value="<?php echo $val; ?>" class="day-checkbox sr-only peer">
+                            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#1e2336] border-2 border-gray-600 flex items-center justify-center text-gray-400 group-hover:border-cyan-400 group-hover:text-gray-200 peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 transition-all font-bold text-xs sm:text-sm shadow-lg transform active:scale-95 select-none">
+                                <?php echo $label; ?>
+                            </div>
+                            <div class="absolute inset-0 rounded-full bg-cyan-400 opacity-0 peer-checked:opacity-30 blur-md transition-opacity duration-300"></div>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-700/50">
+            <button type="button" onclick="document.getElementById('settings-modal').classList.add('hidden')" class="px-5 py-2.5 text-gray-400 hover:text-white transition-colors text-sm font-medium rounded-lg hover:bg-white/5">Cancelar</button>
+            <button type="button" id="save-settings-btn" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-cyan-500/20 transition-all transform hover:scale-105 active:scale-95 text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                Salvar Alterações
+            </button>
+        </div>
+    </div>
+</div>
