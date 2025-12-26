@@ -13,10 +13,8 @@ import { EmailService } from './email/email.service';
 import { NotificationModule } from './notification/notification.module';
 import { NotificationService } from './notification/notification.service';
 import { ConfigModule } from '@nestjs/config';
-import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { EncryptionService } from './encryption/encryption.service';
-import { WhatsappService } from './whatsapp/whatsapp.service';
 import { PusherAuthController } from './pusher-auth/pusher-auth.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { GroupModule } from './group/group.module';
@@ -35,7 +33,6 @@ import { GroupModule } from './group/group.module';
     AuthModule,
     EmailModule,
     NotificationModule,
-    WhatsappModule,
     EncryptionModule,
     GroupModule,
   ],
@@ -46,7 +43,6 @@ import { GroupModule } from './group/group.module';
     EmailService,
     NotificationService,
     EncryptionService,
-    WhatsappService,
   ],
 })
 export class AppModule {}

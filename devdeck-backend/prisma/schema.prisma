@@ -83,16 +83,16 @@ model GroupMember {
 }
 
 model Task {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   title          String
   description    String?
-  status         String   @default("TODO")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         String    @default("TODO")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   boardId        Int
   assignedUserId Int?
-  board          Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  assignedUser   User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  board          Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  assignedUser   User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
   subtasks       Subtask[]
 
   @@index([boardId], map: "tasks_boardId_fkey")

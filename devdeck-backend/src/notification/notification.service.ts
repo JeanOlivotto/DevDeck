@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
-import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class NotificationService {
@@ -11,7 +10,6 @@ export class NotificationService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
-    private whatsappService: WhatsappService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
@@ -19,7 +17,7 @@ export class NotificationService {
     this.logger.log('Rodando resumo diário...');
     const usersToNotify = await this.prisma.user.findMany({
       where: {
-        OR: [{ notifyDailySummary: true }, { notifyViaWhatsApp: true }],
+        notifyDailySummary: true,
       },
     });
 
@@ -46,23 +44,6 @@ export class NotificationService {
               this.logger.error(`Falha ao enviar email para ${user.email}`, e),
             );
         }
-
-        if (user.notifyViaWhatsApp && user.whatsappNumber) {
-          this.logger.log(
-            `Enviando resumo diário por WHATSAPP para ${user.whatsappNumber}`,
-          );
-          try {
-            await this.whatsappService.sendMessage(
-              user.id,
-              user.whatsappNumber,
-              messageText,
-            );
-          } catch (error) {
-            this.logger.error(
-              `Falha ao enviar WhatsApp para ${user.whatsappNumber} (User ID: ${user.id}): ${(error as Error).message}`,
-            );
-          }
-        }
       }
     }
   }
@@ -77,7 +58,7 @@ export class NotificationService {
         updatedAt: { lt: twoDaysAgo },
         board: {
           user: {
-            OR: [{ notifyStaleTasks: true }, { notifyViaWhatsApp: true }],
+            notifyStaleTasks: true,
           },
         },
       },
@@ -126,23 +107,6 @@ export class NotificationService {
               e,
             ),
           );
-      }
-
-      if (user.notifyViaWhatsApp && user.whatsappNumber) {
-        this.logger.log(
-          `Notificando ${user.whatsappNumber} (WHATSAPP) sobre ${tasks.length} tarefa(s) parada(s).`,
-        );
-        try {
-          await this.whatsappService.sendMessage(
-            user.id,
-            user.whatsappNumber,
-            messageText,
-          );
-        } catch (error) {
-          this.logger.error(
-            `Falha ao enviar WhatsApp (stale) para ${user.whatsappNumber} (User ID: ${user.id}): ${(error as Error).message}`,
-          );
-        }
       }
 
       const taskIdsToUpdate = tasks.map((t) => t.id);

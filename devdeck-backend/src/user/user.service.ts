@@ -42,26 +42,6 @@ export class UserService {
       throw new NotFoundException(`Usuário com ID ${userId} não encontrado.`);
     }
 
-    // Validação extra: Se notifyViaWhatsApp é true, whatsappNumber não pode ser null/vazio
-    if (settings.notifyViaWhatsApp === true) {
-      // Se o número não está sendo atualizado agora, busca o atual no banco
-      const currentNumber =
-        settings.whatsappNumber ?? userExists.whatsappNumber;
-      if (!currentNumber) {
-        throw new InternalServerErrorException(
-          'É necessário fornecer um número de WhatsApp para ativar as notificações.',
-        );
-      }
-      // Atualiza o número no DTO se ele foi buscado do banco, para garantir que seja salvo
-      if (!settings.whatsappNumber && currentNumber) {
-        settings.whatsappNumber = currentNumber;
-      }
-    }
-    // Se está desativando as notificações, NÃO limpar o número automaticamente
-    // if (settings.notifyViaWhatsApp === false) {
-    //     settings.whatsappNumber = null; // Ou manter o número salvo
-    // }
-
     try {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
