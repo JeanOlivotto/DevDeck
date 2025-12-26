@@ -1,9 +1,9 @@
-/* KANBAN SETTINGS & NAVBAR FIX - FINAL v3 */
+/* KANBAN SETTINGS - FINAL FIX v4 (NULL SAFE) */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Menu de Usuário (Dropdown) - Lógica de Força Bruta
+    // 1. Menu de Usuário (Dropdown)
     const userMenuBtn = document.getElementById('user-menu-button');
-    const userDropdown = document.getElementById('user-menu-dropdown-v2'); // Usa o ID V2
+    const userDropdown = document.getElementById('user-menu-dropdown-v2');
     const arrow = document.getElementById('dropdown-arrow');
 
     if (userMenuBtn && userDropdown) {
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Inicializar listeners do Modal
+    // Inicializar settings
     setupSettingsListeners();
 });
 
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentUserSettings = { notifyDailySummary: true, notifyStaleTasks: true, discordWebhook: '', notificationDays: '' };
 
 window.openSettingsModal = async function() {
-    // Fecha o menu se estiver aberto
+    // Fecha menu
     const dropdown = document.getElementById('user-menu-dropdown-v2');
     if(dropdown) {
         dropdown.classList.add('hidden');
@@ -51,7 +51,7 @@ window.openSettingsModal = async function() {
 
     const modal = document.getElementById('settings-modal');
     if (!modal) {
-        alert('ERRO: Modal não encontrado. Verifique se copiou o HTML para modals.php');
+        alert('ERRO: Modal não encontrado em modals.php');
         return;
     }
     
@@ -67,12 +67,11 @@ async function loadUserSettings() {
             setInputValue('settings-notify-stale', user.notifyStaleTasks, true);
             setInputValue('settings-discord-webhook', user.discordWebhook || '');
             
-            // Lógica do Toggle do Discord
+            // Define estado do toggle baseado se existe webhook
             const hasDiscord = !!(user.discordWebhook && user.discordWebhook.trim() !== '');
             setInputValue('settings-enable-discord', hasDiscord, true);
             toggleDiscordContainer(hasDiscord);
 
-            // Dias
             const savedDays = (user.notificationDays || "1,2,3,4,5").split(',');
             document.querySelectorAll('.day-checkbox').forEach(chk => chk.checked = savedDays.includes(chk.value));
         }
@@ -80,27 +79,33 @@ async function loadUserSettings() {
 }
 
 function setupSettingsListeners() {
-    // Listener do Botão Salvar
     const saveBtn = document.getElementById('save-settings-btn');
     if (saveBtn) {
         const newSaveBtn = saveBtn.cloneNode(true);
         saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
 
         newSaveBtn.addEventListener('click', async () => {
-            // Verifica se o toggle do Discord está ativo
+            // Lógica Blindada para Webhook
             const enableDiscord = getInputValue('settings-enable-discord', true);
+            const rawWebhook = getInputValue('settings-discord-webhook', false);
             
+            // SE desativado OU vazio -> envia NULL (limpa no banco)
+            // SE ativado E tem texto -> envia o texto
+            let finalWebhook = null;
+            if (enableDiscord && rawWebhook && rawWebhook.trim() !== '') {
+                finalWebhook = rawWebhook.trim();
+            }
+
             const payload = {
                 notifyDailySummary: getInputValue('settings-notify-daily', true),
                 notifyStaleTasks: getInputValue('settings-notify-stale', true),
-                // Se toggle desligado, envia string vazia para limpar no backend
-                discordWebhook: enableDiscord ? getInputValue('settings-discord-webhook', false) : '',
+                discordWebhook: finalWebhook, // Agora envia null se estiver vazio
                 notificationDays: Array.from(document.querySelectorAll('.day-checkbox:checked')).map(c => c.value).join(',')
             };
 
             try {
                 await DevDeck.fetchApi('/user/settings', { method: 'PATCH', body: JSON.stringify(payload) });
-                DevDeck.showAlert('Configurações salvas com sucesso!', 'Sucesso');
+                DevDeck.showAlert('Configurações salvas!', 'Sucesso');
                 document.getElementById('settings-modal').classList.add('hidden');
             } catch (e) { 
                 DevDeck.showAlert('Erro ao salvar: ' + e.message, 'Erro'); 
@@ -108,37 +113,21 @@ function setupSettingsListeners() {
         });
     }
 
-    // Listener do Toggle do Discord (Show/Hide dinâmico)
     const discordToggle = document.getElementById('settings-enable-discord');
     if(discordToggle) {
-        // Remove listener antigo clonando
         const newToggle = discordToggle.cloneNode(true);
         discordToggle.parentNode.replaceChild(newToggle, discordToggle);
-        
-        newToggle.addEventListener('change', (e) => {
-            toggleDiscordContainer(e.target.checked);
-        });
+        newToggle.addEventListener('change', (e) => toggleDiscordContainer(e.target.checked));
     }
 }
 
 function toggleDiscordContainer(show) {
     const container = document.getElementById('discord-input-container');
     if(container) {
-        if(show) {
-            container.classList.remove('hidden');
-        } else {
-            container.classList.add('hidden');
-        }
+        if(show) container.classList.remove('hidden');
+        else container.classList.add('hidden');
     }
 }
 
-// Helpers
-function setInputValue(id, val, chk=false) { 
-    const el = document.getElementById(id); 
-    if(el) { chk ? el.checked = val : el.value = val; } 
-}
-function getInputValue(id, chk=false) { 
-    const el = document.getElementById(id); 
-    if(!el) return null; 
-    return chk ? el.checked : el.value; 
-}
+function setInputValue(id, val, chk=false) { const el = document.getElementById(id); if(el) { chk ? el.checked = val : el.value = val; } }
+function getInputValue(id, chk=false) { const el = document.getElementById(id); if(!el) return null; return chk ? el.checked : el.value; }
