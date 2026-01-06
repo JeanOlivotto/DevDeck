@@ -8,6 +8,8 @@ import {
   IsInt,
   ValidateNested,
   IsIn,
+  IsUrl,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -26,6 +28,13 @@ export class CreateBoardDto {
   @IsOptional()
   @IsInt({ message: 'O ID do grupo deve ser um número inteiro.' })
   groupId?: number;
+
+  @IsOptional()
+  @ValidateIf((o) => o.discordWebhook !== null && o.discordWebhook !== '')
+  @IsString()
+  @IsUrl({}, { message: 'A URL do Webhook do Discord é inválida.' })
+  @MaxLength(255, { message: 'O webhook não pode ter mais que 255 caracteres.' })
+  discordWebhook?: string | null;
 }
 
 export class UpdateBoardDto {
@@ -34,6 +43,13 @@ export class UpdateBoardDto {
   @MaxLength(100, { message: 'O nome não pode ter mais que 100 caracteres.' })
   @IsOptional()
   name?: string;
+
+  @IsOptional()
+  @ValidateIf((o) => o.discordWebhook !== null && o.discordWebhook !== '')
+  @IsString()
+  @IsUrl({}, { message: 'A URL do Webhook do Discord é inválida.' })
+  @MaxLength(255, { message: 'O webhook não pode ter mais que 255 caracteres.' })
+  discordWebhook?: string | null;
 }
 
 export class BoardOrderDto {

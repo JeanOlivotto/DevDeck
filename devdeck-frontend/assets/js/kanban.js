@@ -112,6 +112,7 @@ function renderBoardSelectors(boards) {
     boards.forEach(board => {
         const btn = document.createElement('button');
         btn.className = 'board-button';
+        btn.dataset.boardId = board.id;
         if (board.id == currentBoardId) btn.classList.add('active');
         btn.innerHTML = `<span>${board.name}</span>`;
         btn.onclick = () => selectBoard(board.id);
@@ -119,10 +120,35 @@ function renderBoardSelectors(boards) {
         // Ações (Edit/Delete)
         const actions = document.createElement('div');
         actions.className = 'flex gap-2 ml-2';
-        actions.innerHTML = `
-            <svg class="w-4 h-4 cursor-pointer hover:text-cyan-400" onclick="event.stopPropagation(); openBoardModal({id: ${board.id}, name: '${board.name}'})"><path fill="currentColor" d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
-            <svg class="w-4 h-4 cursor-pointer hover:text-red-400" onclick="event.stopPropagation(); handleDeleteBoard(${board.id}, '${board.name}')"><path fill="currentColor" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"></path></svg>
-        `;
+        
+        // Botão Editar
+        const editIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        editIcon.setAttribute('class', 'w-4 h-4 cursor-pointer hover:text-cyan-400');
+        editIcon.setAttribute('viewBox', '0 0 20 20');
+        editIcon.setAttribute('fill', 'currentColor');
+        editIcon.innerHTML = '<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>';
+        editIcon.onclick = (e) => {
+            e.stopPropagation();
+            if (typeof openBoardModal === 'function') {
+                openBoardModal(board);
+            } else {
+                console.error('openBoardModal não está definido');
+            }
+        };
+        
+        // Botão Deletar
+        const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        deleteIcon.setAttribute('class', 'w-4 h-4 cursor-pointer hover:text-red-400');
+        deleteIcon.setAttribute('viewBox', '0 0 20 20');
+        deleteIcon.setAttribute('fill', 'currentColor');
+        deleteIcon.innerHTML = '<path d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"></path>';
+        deleteIcon.onclick = (e) => {
+            e.stopPropagation();
+            handleDeleteBoard(board.id, board.name);
+        };
+        
+        actions.appendChild(editIcon);
+        actions.appendChild(deleteIcon);
         btn.appendChild(actions);
         container.appendChild(btn);
     });

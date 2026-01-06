@@ -26,11 +26,9 @@ export class NotificationService {
   async handleDailySummary() {
     this.logger.log('Rodando resumo diário...');
 
-    // Busca usuários que querem Email OU têm Discord
+    // Busca usuários que querem receber notificações por email
     const users = await this.prisma.user.findMany({
-      where: {
-        OR: [{ notifyDailySummary: true }, { discordWebhook: { not: null } }],
-      },
+      where: { notifyDailySummary: true },
       include: {
         groupMembers: {
           where: { inviteStatus: 'accepted' },
@@ -59,30 +57,47 @@ export class NotificationService {
       });
 
       if (pendingTasks.length > 0) {
-        let messageText = `**Olá ${user.name}!** 👋\n\nVocê tem **${pendingTasks.length}** tarefa(s) pendente(s) hoje:\n`;
-
+        // Agrupa tarefas por board para enviar notificações no canal correto
+        const tasksByBoard = new Map<number, any[]>();
+        
         pendingTasks.forEach((task) => {
-          const prefix =
-            task.board.type === 'group' ? '[👥 Grupo]' : '[👤 Pessoal]';
-          messageText += `• ${prefix} [${task.board.name}] ${task.title} (${task.status})\n`;
+          if (!tasksByBoard.has(task.boardId)) {
+            tasksByBoard.set(task.boardId, []);
+          }
+          tasksByBoard.get(task.boardId)!.push(task);
         });
 
-        // Só envia email se o usuário marcou a opção
+        // Envia email geral com resumo de todos os boards
+        let emailText = `Olá ${user.name}!\n\nVocê tem ${pendingTasks.length} tarefa(s) pendente(s) hoje:\n`;
+        pendingTasks.forEach((task) => {
+          const prefix = task.board.type === 'group' ? '[👥 Grupo]' : '[👤 Pessoal]';
+          emailText += `• ${prefix} [${task.board.name}] ${task.title} (${task.status})\n`;
+        });
+
         if (user.notifyDailySummary) {
           this.emailService
-            .sendEmail(
-              user.email,
-              'Seu Resumo Diário - DevDeck',
-              messageText.replace(/\*\*/g, ''),
-            )
+            .sendEmail(user.email, 'Seu Resumo Diário - DevDeck', emailText)
             .catch((e) => this.logger.error(`Erro email ${user.email}`, e));
         }
 
-        // Só envia Discord se o usuário configurou o Webhook
-        if (user.discordWebhook) {
-          this.discordService
-            .sendNotification(user.discordWebhook, messageText)
-            .catch((e) => this.logger.error(`Erro Discord ${user.email}`, e));
+        // Envia para Discord - uma notificação por board no canal configurado
+        for (const [boardId, tasks] of tasksByBoard.entries()) {
+          const board = tasks[0].board;
+          
+          if (board.discordWebhook) {
+            let discordText = `**📋 ${board.name}** - Resumo de Tarefas\n\n`;
+            discordText += `**${tasks.length}** tarefa(s) pendente(s):\n`;
+            
+            tasks.forEach((task) => {
+              discordText += `• ${task.title} (${task.status})\n`;
+            });
+
+            this.discordService
+              .sendNotification(board.discordWebhook, discordText)
+              .catch((e) => 
+                this.logger.error(`Erro Discord board ${board.name}`, e)
+              );
+          }
         }
       }
     }
@@ -112,9 +127,18 @@ export class NotificationService {
       },
     });
 
+    // Agrupa tarefas por board para enviar no canal correto
+    const tasksByBoard = new Map<number, any[]>();
     const notificationsMap = new Map<number, { user: User; tasks: any[] }>();
 
     for (const task of staleTasks) {
+      // Agrupa por board para Discord
+      if (!tasksByBoard.has(task.boardId)) {
+        tasksByBoard.set(task.boardId, []);
+      }
+      tasksByBoard.get(task.boardId)!.push(task);
+
+      // Agrupa por usuário para Email
       const potentialUsers: User[] = [];
 
       if (task.board.type === 'personal' && task.board.user) {
@@ -124,10 +148,7 @@ export class NotificationService {
       }
 
       for (const u of potentialUsers) {
-        const wantsEmail = u.notifyStaleTasks;
-        const hasDiscord = !!u.discordWebhook;
-
-        if (wantsEmail || hasDiscord) {
+        if (u.notifyStaleTasks) {
           if (!notificationsMap.has(u.id)) {
             notificationsMap.set(u.id, { user: u, tasks: [] });
           }
@@ -139,10 +160,11 @@ export class NotificationService {
       }
     }
 
+    // Envia notificações por Email (agrupadas por usuário)
     for (const { user, tasks } of notificationsMap.values()) {
       if (!this.isTodayAllowed(user.notificationDays)) continue;
 
-      let messageText = `⚠️ **Atenção, ${user.name}!**\n\nTarefas paradas há mais de 2 dias:\n`;
+      let messageText = `⚠️ Atenção, ${user.name}!\n\nTarefas paradas há mais de 2 dias:\n`;
       tasks.forEach((task) => {
         const boardInfo =
           task.board.type === 'group'
@@ -153,19 +175,27 @@ export class NotificationService {
 
       if (user.notifyStaleTasks) {
         this.emailService
-          .sendEmail(
-            user.email,
-            'Alerta: Tarefas Paradas',
-            messageText.replace(/\*\*/g, ''),
-          )
+          .sendEmail(user.email, 'Alerta: Tarefas Paradas', messageText)
           .catch((e) => this.logger.error(`Erro email stale ${user.email}`, e));
       }
+    }
 
-      if (user.discordWebhook) {
+    // Envia notificações por Discord (agrupadas por board/canal)
+    for (const [boardId, tasks] of tasksByBoard.entries()) {
+      const board = tasks[0].board;
+
+      if (board.discordWebhook) {
+        let discordText = `⚠️ **Alerta - ${board.name}**\n\n`;
+        discordText += `**${tasks.length}** tarefa(s) parada(s) há mais de 2 dias:\n`;
+        
+        tasks.forEach((task) => {
+          discordText += `• ${task.title}\n`;
+        });
+
         this.discordService
-          .sendNotification(user.discordWebhook, messageText)
+          .sendNotification(board.discordWebhook, discordText)
           .catch((e) =>
-            this.logger.error(`Erro Discord stale ${user.email}`, e),
+            this.logger.error(`Erro Discord stale board ${board.name}`, e),
           );
       }
     }

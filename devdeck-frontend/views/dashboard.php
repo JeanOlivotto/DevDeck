@@ -82,11 +82,21 @@ $pageTitle = 'DevDeck - Dashboard';
 <script src="<?php echo url('assets/js/component-updates.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban-modals.js'); ?>"></script>
+<script src="<?php echo url('assets/js/kanban-board-modal.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban-settings.js'); ?>"></script>
 <script src="<?php echo url('assets/js/invites.js'); ?>"></script>
 <script src="<?php echo url('assets/js/groups.js'); ?>"></script>
 <script src="<?php echo url('assets/js/group-modals.js'); ?>"></script>
 <script src="<?php echo url('assets/js/groups-sidebar.js'); ?>"></script>
 <script src="<?php echo url('assets/js/groups-navbar.js'); ?>"></script>
+
+<script>
+// Inicializar listeners dos modais
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof setupBoardModalListeners === 'function') {
+        setupBoardModalListeners();
+    }
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
