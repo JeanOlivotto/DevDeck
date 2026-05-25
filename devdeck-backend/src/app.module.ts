@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module'; // Importa o PrismaModule
 import { BoardModule } from './board/board.module';
 import { TaskModule } from './task/task.module';
@@ -25,6 +27,10 @@ import { DiscordModule } from './discord/discord.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
     }),
     ScheduleModule.forRoot(),
     PrismaModule,

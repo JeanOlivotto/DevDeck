@@ -1,4 +1,3 @@
-// Usaremos class-validator para validação
 import {
   IsNotEmpty,
   IsOptional,
@@ -6,6 +5,7 @@ import {
   MaxLength,
   IsArray,
   IsInt,
+  IsBoolean,
   ValidateNested,
   IsIn,
   IsUrl,
@@ -33,7 +33,9 @@ export class CreateBoardDto {
   @ValidateIf((o) => o.discordWebhook !== null && o.discordWebhook !== '')
   @IsString()
   @IsUrl({}, { message: 'A URL do Webhook do Discord é inválida.' })
-  @MaxLength(255, { message: 'O webhook não pode ter mais que 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O webhook não pode ter mais que 255 caracteres.',
+  })
   discordWebhook?: string | null;
 }
 
@@ -48,8 +50,14 @@ export class UpdateBoardDto {
   @ValidateIf((o) => o.discordWebhook !== null && o.discordWebhook !== '')
   @IsString()
   @IsUrl({}, { message: 'A URL do Webhook do Discord é inválida.' })
-  @MaxLength(255, { message: 'O webhook não pode ter mais que 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O webhook não pode ter mais que 255 caracteres.',
+  })
   discordWebhook?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isMainTicketBoard?: boolean;
 }
 
 export class BoardOrderDto {

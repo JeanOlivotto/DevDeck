@@ -1,6 +1,17 @@
-import { IsBoolean, IsOptional, IsString, IsUrl } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+} from 'class-validator';
 
 export class UpdateUserSettingsDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  name?: string;
+
   @IsBoolean()
   @IsOptional()
   notifyDailySummary?: boolean;

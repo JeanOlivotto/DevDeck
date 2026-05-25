@@ -59,7 +59,7 @@ export class NotificationService {
       if (pendingTasks.length > 0) {
         // Agrupa tarefas por board para enviar notificações no canal correto
         const tasksByBoard = new Map<number, any[]>();
-        
+
         pendingTasks.forEach((task) => {
           if (!tasksByBoard.has(task.boardId)) {
             tasksByBoard.set(task.boardId, []);
@@ -70,7 +70,8 @@ export class NotificationService {
         // Envia email geral com resumo de todos os boards
         let emailText = `Olá ${user.name}!\n\nVocê tem ${pendingTasks.length} tarefa(s) pendente(s) hoje:\n`;
         pendingTasks.forEach((task) => {
-          const prefix = task.board.type === 'group' ? '[👥 Grupo]' : '[👤 Pessoal]';
+          const prefix =
+            task.board.type === 'group' ? '[👥 Grupo]' : '[👤 Pessoal]';
           emailText += `• ${prefix} [${task.board.name}] ${task.title} (${task.status})\n`;
         });
 
@@ -83,19 +84,19 @@ export class NotificationService {
         // Envia para Discord - uma notificação por board no canal configurado
         for (const [boardId, tasks] of tasksByBoard.entries()) {
           const board = tasks[0].board;
-          
+
           if (board.discordWebhook) {
             let discordText = `**📋 ${board.name}** - Resumo de Tarefas\n\n`;
             discordText += `**${tasks.length}** tarefa(s) pendente(s):\n`;
-            
+
             tasks.forEach((task) => {
               discordText += `• ${task.title} (${task.status})\n`;
             });
 
             this.discordService
               .sendNotification(board.discordWebhook, discordText)
-              .catch((e) => 
-                this.logger.error(`Erro Discord board ${board.name}`, e)
+              .catch((e) =>
+                this.logger.error(`Erro Discord board ${board.name}`, e),
               );
           }
         }
@@ -187,7 +188,7 @@ export class NotificationService {
       if (board.discordWebhook) {
         let discordText = `⚠️ **Alerta - ${board.name}**\n\n`;
         discordText += `**${tasks.length}** tarefa(s) parada(s) há mais de 2 dias:\n`;
-        
+
         tasks.forEach((task) => {
           discordText += `• ${task.title}\n`;
         });

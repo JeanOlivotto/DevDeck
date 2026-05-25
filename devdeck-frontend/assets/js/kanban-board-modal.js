@@ -55,11 +55,16 @@ function openBoardModal(board = null) {
         // Mostrar seção de tickets públicos para boards pessoais
         if (board.type === 'personal' && publicSection) {
             publicSection.classList.remove('hidden');
-            
+
+            const isMainInput = document.getElementById('board-is-main');
+            if (isMainInput) {
+                isMainInput.checked = !!board.isMainTicketBoard;
+            }
+
             if (isPublicInput) {
                 isPublicInput.checked = !!board.isPublicTicketBoard;
             }
-            
+
             if (board.isPublicTicketBoard && board.publicToken) {
                 const baseUrl = window.location.origin;
                 const publicUrl = `${baseUrl}/ticket.php?token=${board.publicToken}`;
@@ -189,9 +194,11 @@ async function handleBoardFormSubmit(e) {
         
         if (boardModalState.isEditing && boardModalState.currentBoardId) {
             // Editar board existente
-            const payload = { 
+            const isMainInput = document.getElementById('board-is-main');
+            const payload = {
                 name,
-                discordWebhook: finalWebhook
+                discordWebhook: finalWebhook,
+                ...(isMainInput ? { isMainTicketBoard: isMainInput.checked } : {})
             };
             
             await DevDeck.fetchApi(`/boards/${boardModalState.currentBoardId}`, {

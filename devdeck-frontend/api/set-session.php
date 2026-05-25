@@ -23,6 +23,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 $token = $input['token'] ?? null;
 $email = $input['email'] ?? null;
 $name = $input['name'] ?? null;
+$isDevTeam = isset($input['isDevTeam']) ? (bool)$input['isDevTeam'] : false;
 
 if (!$token) {
     http_response_code(400);
@@ -34,7 +35,7 @@ if (!$token) {
 session_unset();
 
 // 2. Salva os dados novos
-setAuthData($token, $email, $name);
+setAuthData($token, $email, $name, $isDevTeam);
 
 // 3. Regenera o ID da sessão (segurança contra session fixation)
 session_regenerate_id(true);

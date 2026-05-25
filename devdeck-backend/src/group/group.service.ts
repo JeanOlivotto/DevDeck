@@ -90,6 +90,37 @@ export class GroupService {
   }
 
   /**
+   * Obter membros aceitos do grupo (para atribuição de tarefas)
+   */
+  async getAcceptedMembers(id: number, userId: number) {
+    const group = await this.prisma.group.findUnique({
+      where: { id },
+      include: {
+        members: {
+          where: {
+            inviteStatus: 'accepted',
+          },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (!group) {
+      throw new NotFoundException('Grupo não encontrado');
+    }
+
+    // Verificar se user é membro
+    const isMember = group.members.some((m) => m.userId === userId);
+    if (!isMember) {
+      throw new ForbiddenException('Você não é membro deste grupo');
+    }
+
+    return group.members;
+  }
+
+  /**
    * Atualizar grupo (apenas owner/admin)
    */
   async update(id: number, updateGroupDto: UpdateGroupDto, userId: number) {

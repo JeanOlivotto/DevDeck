@@ -50,6 +50,10 @@ export class CreateTaskDto {
   @IsString()
   @IsOptional()
   tags?: string; // "bug,front,api"
+
+  @IsInt()
+  @IsOptional()
+  assignedUserId?: number; // Pessoa responsável pela task
 }
 
 // NOVO: DTO Exclusivo para Tickets Públicos (Não pede boardId, pede Token na URL)
@@ -70,10 +74,23 @@ export class CreateTicketDto {
   @IsNotEmpty()
   requesterEmail: string;
 
-  // Prioridade opcional para o cliente (pode ser hidden no front ou não)
-  @IsEnum(TaskPriority)
+  @IsString()
   @IsOptional()
-  priority?: string;
+  category?: string;
+}
+
+export class CreateEmployeeTicketDto {
+  @IsString()
+  @IsNotEmpty({ message: 'O título é obrigatório.' })
+  title: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'A categoria é obrigatória.' })
+  category: string;
 }
 
 export class UpdateTaskDto {
@@ -99,9 +116,8 @@ export class UpdateTaskDto {
 
   @IsInt()
   @IsOptional()
-  assignedUserId?: number; // Para "Aceitar" o ticket
+  assignedUserId?: number;
 
-  // --- NOVOS CAMPOS EM UPDATE ---
   @IsEnum(TaskPriority)
   @IsOptional()
   priority?: string;
@@ -117,6 +133,10 @@ export class UpdateTaskDto {
   @IsString()
   @IsOptional()
   tags?: string;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 }
 
 // Mantive Subtasks igual

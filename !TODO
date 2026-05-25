@@ -1,3 +1,9 @@
-Notificação pelo whatsapp ou discord.
-Funcionalidade de ticket (sem ter que ficar fazendo requisição na api a todo instante. (receber uma noticiação no front ou algo assim))
-Ajustes esteticos.
+Colocar a pessoa responsável pela task e conseguir trocar de pessoa responsável pela task
+
+
+┌─────────┬───────────────┬─────────────────────┬──────────┬─────────────────────────────────────┐
+  │ Perfil  │     Nome      │        Email        │  Senha   │               Acesso                │
+  ├─────────┼───────────────┼─────────────────────┼──────────┼─────────────────────────────────────┤
+  │ Dev     │ João Vitor    │ joao@bjgroup.com    │ joao123  │ Dashboard (Kanban, boards, tickets) │
+  ├─────────┼───────────────┼─────────────────────┼──────────┼─────────────────────────────────────┤
+  │ Usuário │ Usuário Teste │ teste@previnity.com │ teste123 │ Portal (abrir e acompanhar tickets) │

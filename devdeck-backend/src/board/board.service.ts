@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Injectable,
   NotFoundException,
@@ -97,6 +96,14 @@ export class BoardService {
 
   async update(id: number, userId: number, updateBoardDto: UpdateBoardDto) {
     await this.findOne(id, userId);
+
+    if (updateBoardDto.isMainTicketBoard === true) {
+      await this.prisma.board.updateMany({
+        where: { isMainTicketBoard: true, id: { not: id } },
+        data: { isMainTicketBoard: false },
+      });
+    }
+
     return this.prisma.board.update({
       where: { id },
       data: updateBoardDto,

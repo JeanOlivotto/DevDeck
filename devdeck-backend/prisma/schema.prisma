@@ -12,6 +12,8 @@ model User {
   email              String        @unique
   name               String
   password           String
+  company            String?
+  isDevTeam          Boolean       @default(false)
   discordWebhook     String?       @db.VarChar(255)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -22,6 +24,7 @@ model User {
   groupMembers       GroupMember[]
   groupsOwned        Group[]       @relation("groupOwner")
   assignedTasks      Task[]
+  requestedTasks     Task[]        @relation("requester")
 
   @@map("users")
 }
@@ -38,6 +41,7 @@ model Board {
   updatedAt           DateTime @updatedAt
   isPublicTicketBoard Boolean  @default(false)
   publicToken         String?  @unique
+  isMainTicketBoard   Boolean  @default(false)
   group               Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks               Task[]
@@ -93,15 +97,20 @@ model Task {
   estimatedTime  Int?
   dueDate        DateTime?
   tags           String?
-  isTicket       Boolean   @default(false)
-  requesterName  String?
-  requesterEmail String?
-  subtasks       Subtask[]
-  assignedUser   User?     @relation(fields: [assignedUserId], references: [id])
-  board          Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  isTicket         Boolean   @default(false)
+  requesterName    String?
+  requesterEmail   String?
+  requesterUserId  Int?
+  category         String?
+  attachments      String?
+  subtasks         Subtask[]
+  assignedUser     User?     @relation(fields: [assignedUserId], references: [id])
+  requester        User?     @relation("requester", fields: [requesterUserId], references: [id])
+  board            Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
 
   @@index([boardId], map: "tasks_boardId_fkey")
   @@index([assignedUserId], map: "tasks_assignedUserId_fkey")
+  @@index([requesterUserId], map: "tasks_requesterUserId_fkey")
   @@map("tasks")
 }
 

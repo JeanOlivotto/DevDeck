@@ -58,6 +58,16 @@ export class GroupController {
   }
 
   /**
+   * GET /api/groups/:id/members
+   * Obter membros aceitos do grupo (para atribuição de tarefas)
+   */
+  @Get(':id/members')
+  async getAcceptedMembers(@Param('id', ParseIntPipe) id: number, @Req() req) {
+    const userId = req.user.userId;
+    return this.groupService.getAcceptedMembers(id, userId);
+  }
+
+  /**
    * GET /api/groups/:id
    * Detalhes do grupo
    */

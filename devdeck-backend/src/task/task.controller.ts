@@ -8,17 +8,31 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
   Req,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { TaskService } from './task.service';
 import {
   CreateTaskDto,
+  CreateEmployeeTicketDto,
   UpdateTaskDto,
   CreateSubtaskDto,
   UpdateSubtaskDto,
   CreateTicketDto,
 } from './dto/task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+const uploadStorage = diskStorage({
+  destination: './uploads',
+  filename: (_req, file, cb) => {
+    cb(null, `${uuidv4()}${extname(file.originalname)}`);
+  },
+});
 
 @Controller('tasks')
 export class TaskController {
@@ -31,13 +45,37 @@ export class TaskController {
   }
 
   // ROTA PÚBLICA: Criar Ticket (Sem Guard)
-  // POST /tasks/ticket/TOKEN_DO_BOARD
   @Post('ticket/:token')
+  @UseInterceptors(
+    FilesInterceptor('attachments', 5, { storage: uploadStorage }),
+  )
   async createTicket(
     @Param('token') token: string,
     @Body() createTicketDto: CreateTicketDto,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    return this.taskService.createPublicTicket(token, createTicketDto);
+    return this.taskService.createPublicTicket(token, createTicketDto, files);
+  }
+
+  // Funcionário autenticado abre ticket no board principal
+  @UseGuards(JwtAuthGuard)
+  @Post('employee-submit')
+  @UseInterceptors(
+    FilesInterceptor('attachments', 5, { storage: uploadStorage }),
+  )
+  createEmployeeTicket(
+    @Req() req,
+    @Body() dto: CreateEmployeeTicketDto,
+    @UploadedFiles() files?: Express.Multer.File[],
+  ) {
+    return this.taskService.createEmployeeTicket(req.user.userId, dto, files);
+  }
+
+  // Funcionário vê seus próprios tickets
+  @UseGuards(JwtAuthGuard)
+  @Get('my-tickets')
+  findMyTickets(@Req() req) {
+    return this.taskService.findMyTickets(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

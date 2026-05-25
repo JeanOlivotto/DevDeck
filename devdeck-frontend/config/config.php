@@ -5,8 +5,8 @@ define('APP_VERSION', '2.0.0');
 
 // Configurações da API
 define('IS_LOCAL', in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1', 'localhost:8000']));
-define('API_BASE_URL', IS_LOCAL ? 'http://localhost:3000/api' : 'https://dev-deck-api.vercel.app/api');
-define('WS_URL', IS_LOCAL ? 'http://localhost:3000' : 'https://dev-deck-api.vercel.app');
+define('API_BASE_URL', IS_LOCAL ? 'http://localhost:3001/api' : 'https://dev-deck-api.vercel.app/api');
+define('WS_URL', IS_LOCAL ? 'http://localhost:3001' : 'https://dev-deck-api.vercel.app');
 
 // Configurações Pusher
 define('PUSHER_KEY', 'c4f7fea1d37fea1c1c73');
@@ -79,11 +79,17 @@ function getUserName()
     return $_SESSION['user_name'] ?? null;
 }
 
-function setAuthData($token, $email, $name)
+function setAuthData($token, $email, $name, $isDevTeam = false)
 {
     $_SESSION['auth_token'] = $token;
     $_SESSION['user_email'] = $email;
     $_SESSION['user_name'] = $name;
+    $_SESSION['is_dev_team'] = $isDevTeam;
+}
+
+function getIsDevTeam()
+{
+    return $_SESSION['is_dev_team'] ?? false;
 }
 
 function clearAuthData()
@@ -91,6 +97,7 @@ function clearAuthData()
     unset($_SESSION['auth_token']);
     unset($_SESSION['user_email']);
     unset($_SESSION['user_name']);
+    unset($_SESSION['is_dev_team']);
     session_destroy();
 }
 

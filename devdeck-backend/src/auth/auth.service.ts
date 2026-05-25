@@ -23,7 +23,7 @@ export class AuthService {
   ) {}
 
   async signup(createUserDto: CreateUserDto) {
-    const { email, password, name } = createUserDto;
+    const { email, password, name, company } = createUserDto;
     const existingUser = await this.userService.findOneByEmail(email);
     if (existingUser) {
       throw new ConflictException('Este email já está em uso.');
@@ -46,11 +46,22 @@ export class AuthService {
         email,
         name,
         password: hashedPassword,
+        company,
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password: _, ...result } = user;
-      return result;
+
+      // Auto-login após cadastro
+      const payload = {
+        email: result.email,
+        sub: result.id,
+        name: result.name,
+      };
+      return {
+        access_token: this.jwtService.sign(payload),
+        user: result,
+      };
     } catch (error) {
       if (error.code === 'P2002') {
         throw new ConflictException('Este email já está em uso.');

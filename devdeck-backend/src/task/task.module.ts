@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { TaskController } from './task.controller';
-// PrismaModule já é global
+import { EmailModule } from '../email/email.module';
 
 @Module({
+  imports: [EmailModule],
   controllers: [TaskController],
   providers: [TaskService],
 })

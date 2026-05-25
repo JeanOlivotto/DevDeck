@@ -106,7 +106,7 @@ async function loadAndRenderGroupMembers(groupId, container) {
                 <div>
                     <p class="font-medium text-white text-sm">${escapeHtml(member.user.name)}</p>
                     <p class="text-xs text-gray-400">${escapeHtml(member.user.email)}</p>
-                    <span class="text-xs font-semibold text-cyan-400 capitalize">${escapeHtml(member.role)}</span>
+                    <span class="text-xs font-semibold text-[#888888] capitalize">${escapeHtml(member.role)}</span>
                 </div>
                 <button class="remove-member-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs" data-group-id="${groupId}" data-member-id="${member.userId}">
                     Remover

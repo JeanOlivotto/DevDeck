@@ -64,32 +64,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('Login response:', data); // DEBUG
                 
                 if (data?.access_token) {
-                    console.log('Token received, calling setAuthToken'); // DEBUG
                     DevDeck.setAuthToken(data.access_token);
-                    console.log('Token set, localStorage:', localStorage.getItem('devdeck_auth_token')?.substring(0, 20)); // DEBUG
-                    
+
                     if (data.user) {
-                        console.log('Setting user data:', data.user.email); // DEBUG
                         DevDeck.setUserData(data.user.email, data.user.name);
                     }
-                    
+
                     // Sincronizar session PHP com o token JWT
-                    console.log('Syncing PHP session...'); // DEBUG
                     await fetch(BASE_PATH + '/api/set-session.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             token: data.access_token,
                             email: data.user?.email,
-                            name: data.user?.name
+                            name: data.user?.name,
+                            isDevTeam: data.user?.isDevTeam || false
                         })
-                    }).catch(e => console.warn('Session sync warning:', e)); // DEBUG
-                    
-                    console.log('BASE_PATH value:', BASE_PATH); // DEBUG
-                    console.log('Redirect URL:', BASE_PATH + '/views/dashboard.php'); // DEBUG
-                    // Redirecionar para dashboard
-                    window.location.href = BASE_PATH + '/views/dashboard.php';
-                    console.log('Redirect triggered'); // DEBUG
+                    }).catch(e => console.warn('Session sync warning:', e));
+
+                    // Redirecionar conforme tipo de usuário
+                    if (data.user?.isDevTeam) {
+                        window.location.href = BASE_PATH + '/views/dashboard.php';
+                    } else {
+                        window.location.href = BASE_PATH + '/views/portal.php';
+                    }
                 } else {
                     throw new Error('Token de autenticação não recebido');
                 }
@@ -108,13 +106,22 @@ document.addEventListener('DOMContentLoaded', function() {
         signupForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const company = document.getElementById('signup-company')?.value || '';
             const name = document.getElementById('signup-name').value;
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
             const confirmPassword = document.getElementById('signup-confirm-password').value;
-            
+
             if (signupError) signupError.classList.add('hidden');
-            
+
+            if (!company) {
+                if (signupError) {
+                    signupError.textContent = 'Selecione sua empresa';
+                    signupError.classList.remove('hidden');
+                }
+                return;
+            }
+
             // Validar senhas
             if (password !== confirmPassword) {
                 if (signupError) {
@@ -123,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 return;
             }
-            
+
             if (password.length < 6) {
                 if (signupError) {
                     signupError.textContent = 'A senha deve ter no mínimo 6 caracteres';
@@ -131,24 +138,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 return;
             }
-            
+
             try {
                 const data = await DevDeck.fetchApi('/auth/signup', {
                     method: 'POST',
-                    body: JSON.stringify({ name, email, password })
+                    body: JSON.stringify({ name, email, password, company })
                 }, false);
-                
-                console.log('Signup response:', data); // DEBUG
-                
+
                 if (data?.access_token) {
-                    // Cadastro automático com login
-                    console.log('Received access token, setting auth...');
                     DevDeck.setAuthToken(data.access_token);
-                    
+
                     if (data.user) {
                         DevDeck.setUserData(data.user.email, data.user.name);
                     }
-                    
+
                     // Sincronizar session PHP com o token JWT
                     await fetch(BASE_PATH + '/api/set-session.php', {
                         method: 'POST',
@@ -156,17 +159,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         body: JSON.stringify({
                             token: data.access_token,
                             email: data.user?.email,
-                            name: data.user?.name
+                            name: data.user?.name,
+                            isDevTeam: data.user?.isDevTeam || false
                         })
                     }).catch(e => console.warn('Session sync warning:', e));
-                    
-                    // Mostrar alerta de sucesso e redirecionar para dashboard
+
+                    const destination = data.user?.isDevTeam
+                        ? BASE_PATH + '/views/dashboard.php'
+                        : BASE_PATH + '/views/portal.php';
+
                     showSignupSuccessAlert('Bem-vindo!', 'Cadastro realizado com sucesso! Redirecionando...', () => {
-                        window.location.href = BASE_PATH + '/views/dashboard.php';
+                        window.location.href = destination;
                     });
                 } else if (data?.message) {
-                    // Cadastro realizado, mas precisa fazer login na próxima vez
-                    console.log('Signup successful, but requires login');
                     showSignupSuccessAlert('Cadastro Realizado!', 'Sua conta foi criada com sucesso! Redirecionando para login...', () => {
                         window.location.href = BASE_PATH + '/index.php';
                     });
