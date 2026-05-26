@@ -1,31 +1,40 @@
-/* KANBAN CORE - DEBUG VERSION */
+/* KANBAN — Dashboard com Abas */
+
+function getCategoryStyle(cat) {
+    const lower = (cat || '').toLowerCase();
+    if (lower.includes('bug'))           return 'bg-red-900/30 border border-red-800/50 text-red-300';
+    if (lower.includes('funcionalidade') || lower.includes('feature'))
+                                         return 'bg-blue-900/30 border border-blue-800/50 text-blue-300';
+    if (lower.includes('melhoria'))      return 'bg-purple-900/30 border border-purple-800/50 text-purple-300';
+    if (lower.includes('suporte') || lower.includes('dúvida') || lower.includes('duvida'))
+                                         return 'bg-amber-900/30 border border-amber-800/50 text-amber-300';
+    return 'bg-[#2a2a2a] border border-[#404040] text-[#cccccc]';
+}
+window.getCategoryStyle = getCategoryStyle;
 
 let currentBoardId = null;
 let allBoards = [];
 let draggedTaskElement = null;
-let activeCompanyFilter = 'all';
+let historyData = null; // cache do histórico, null = não carregado
 
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('Kanban iniciando...');
-
+document.addEventListener('DOMContentLoaded', async function () {
     try {
         const token = DevDeck.getAuthToken();
         if (!token) {
             window.location.href = BASE_PATH + '/index.php';
             return;
         }
-        
-        // Carregar Usuário
+
         const user = await DevDeck.fetchApi('/user/me');
         if (user) {
-            DevDeck.setUserData(user.email, user.name, user.id);
+            DevDeck.setUserData(user.email, user.name, user.id, user.isDevTeam || false);
             updateUserDisplaySafe(user);
         }
 
-        // Carregar Boards (Blocos)
-        await loadPersonalBoards();
+        // Carregar boards pessoais em background (para criação de tasks)
+        loadPersonalBoards();
 
-        // Carregar Módulos Extras
+        // Módulos extras
         if (typeof loadUserSettings === 'function') await loadUserSettings();
         if (typeof setupInvitesListeners === 'function') {
             setupInvitesListeners();
@@ -33,22 +42,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         if (typeof setupGroupModalListeners === 'function') setupGroupModalListeners();
         if (typeof loadGroups === 'function') loadGroups();
-        
+
         setupGlobalClicks();
+        initTabs();
 
     } catch (error) {
         console.error('ERRO CRÍTICO NO KANBAN:', error);
-        alert('Erro ao carregar o quadro: ' + error.message + '\n\nVerifique o console (F12) para mais detalhes.');
+        alert('Erro ao carregar o quadro: ' + error.message);
     }
 });
 
-// --- FUNÇÕES ---
+// ─── Exibição do usuário ───────────────────────────────────────────────────
 
 function updateUserDisplaySafe(userData) {
     const elName = document.getElementById('user-name-display');
     const elDropName = document.getElementById('user-dropdown-name');
     const elDropEmail = document.getElementById('user-dropdown-email');
-    
+
     if (elName && userData.name) elName.textContent = `Olá, ${userData.name.split(' ')[0]}`;
     if (elDropName) elDropName.textContent = userData.name;
     if (elDropEmail) elDropEmail.textContent = userData.email;
@@ -63,31 +73,32 @@ function setupGlobalClicks() {
             window.location.href = BASE_PATH + '/index.php';
         };
     }
-    
-    // Add Task listener
-    document.body.addEventListener('click', function(e) {
+
+    document.body.addEventListener('click', function (e) {
         const addBtn = e.target.closest('.add-task-button');
         if (addBtn && typeof openTaskModal === 'function') {
-            openTaskModal(null, addBtn.dataset.status);
+            openTaskModal(null, addBtn.dataset.status || 'TODO');
         }
     });
+
+    const manageBoardsBtn = document.getElementById('manage-boards-btn');
+    if (manageBoardsBtn) {
+        manageBoardsBtn.onclick = () => {
+            if (typeof openBoardModal === 'function') openBoardModal();
+        };
+    }
 }
+
+// ─── Boards pessoais (background, para criação de tasks) ─────────────────
 
 async function loadPersonalBoards() {
     if (typeof currentGroupId !== 'undefined') currentGroupId = null;
-    
+
     const boards = await DevDeck.fetchApi('/boards?groupId=personal');
     allBoards = boards || [];
-    renderBoardSelectors(allBoards);
-    
+
     if (allBoards.length > 0) {
-        if (!currentBoardId || !allBoards.find(b => b.id == currentBoardId)) {
-            selectBoard(allBoards[0].id);
-        } else {
-            selectBoard(currentBoardId);
-        }
-    } else {
-        showNoBoardsMessage();
+        currentBoardId = allBoards[0].id;
     }
 }
 
@@ -95,160 +106,99 @@ async function loadGroupBoards(groupId) {
     if (typeof currentGroupId !== 'undefined') currentGroupId = groupId;
     const boards = await DevDeck.fetchApi(`/boards?groupId=${groupId}`);
     allBoards = boards || [];
-    renderBoardSelectors(allBoards);
-    
-    if (allBoards.length > 0) {
-        selectBoard(allBoards[0].id);
-    } else {
-        showNoBoardsMessage();
+    if (allBoards.length > 0) currentBoardId = allBoards[0].id;
+}
+
+async function handleDeleteBoard(id, name) {
+    if (confirm(`Excluir "${name}"?`)) {
+        await DevDeck.fetchApi(`/boards/${id}`, { method: 'DELETE' });
+        await loadPersonalBoards();
     }
 }
 
-function renderBoardSelectors(boards) {
-    const container = document.getElementById('boards-container');
-    if (!container) return;
-    
-    container.innerHTML = '<div class="px-3 py-2 text-sm font-semibold text-gray-400">Quadros</div>';
-    
-    boards.forEach(board => {
-        const btn = document.createElement('button');
-        btn.className = 'board-button';
-        btn.dataset.boardId = board.id;
-        if (board.id == currentBoardId) btn.classList.add('active');
-        btn.innerHTML = `<span>${board.name}</span>`;
-        btn.onclick = () => selectBoard(board.id);
-        
-        // Ações (Edit/Delete)
-        const actions = document.createElement('div');
-        actions.className = 'flex gap-2 ml-2';
-        
-        // Botão Editar
-        const editIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        editIcon.setAttribute('class', 'w-4 h-4 cursor-pointer hover:text-white');
-        editIcon.setAttribute('viewBox', '0 0 20 20');
-        editIcon.setAttribute('fill', 'currentColor');
-        editIcon.innerHTML = '<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>';
-        editIcon.onclick = (e) => {
-            e.stopPropagation();
-            if (typeof openBoardModal === 'function') {
-                openBoardModal(board);
-            } else {
-                console.error('openBoardModal não está definido');
-            }
-        };
-        
-        // Botão Deletar
-        const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        deleteIcon.setAttribute('class', 'w-4 h-4 cursor-pointer hover:text-red-400');
-        deleteIcon.setAttribute('viewBox', '0 0 20 20');
-        deleteIcon.setAttribute('fill', 'currentColor');
-        deleteIcon.innerHTML = '<path d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"></path>';
-        deleteIcon.onclick = (e) => {
-            e.stopPropagation();
-            handleDeleteBoard(board.id, board.name);
-        };
-        
-        actions.appendChild(editIcon);
-        actions.appendChild(deleteIcon);
-        btn.appendChild(actions);
-        container.appendChild(btn);
-    });
-    
-    const newBtn = document.createElement('button');
-    newBtn.className = 'board-button';
-    newBtn.textContent = '+ Novo Quadro';
-    newBtn.onclick = () => { if(typeof openBoardModal === 'function') openBoardModal(); };
-    container.appendChild(newBtn);
-}
+// ─── Navegação por Abas ───────────────────────────────────────────────────
 
-async function selectBoard(boardId) {
-    currentBoardId = boardId;
-    document.querySelectorAll('.board-button').forEach(btn => btn.classList.remove('active'));
-    
-    // Mostrar kanban board e ocultar mensagem de "sem boards"
-    document.getElementById('kanban-board').classList.remove('hidden');
-    document.getElementById('no-boards-message').classList.add('hidden');
-    
-    // Marca ativo visualmente...
-    await loadTasks(boardId);
-}
-
-async function loadTasks(boardId) {
-    activeCompanyFilter = 'all';
-    const tasks = await DevDeck.fetchApi(`/tasks?boardId=${boardId}`);
-    document.querySelectorAll('.tasks').forEach(c => c.innerHTML = '');
-
-    tasks.forEach(task => {
-        const el = createTaskElement(task);
-        const col = document.getElementById(task.status.toLowerCase() + '-tasks');
-        if (col) col.appendChild(el);
+function initTabs() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
 
-    renderCompanyFilter(tasks);
-    setupDragAndDrop();
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash.replace('#', '') || 'kanban';
+        switchTab(hash, false);
+    });
+
+    const initial = window.location.hash.replace('#', '') || 'kanban';
+    switchTab(initial, false);
 }
 
-function renderCompanyFilter(tasks) {
-    const bar = document.getElementById('company-filter-bar');
-    if (!bar) return;
+function switchTab(tab, updateHash = true) {
+    const validTabs = ['kanban', 'coletivo', 'historico'];
+    if (!validTabs.includes(tab)) tab = 'kanban';
 
-    const ticketTasks = tasks.filter(t => t.isTicket);
-    if (ticketTasks.length === 0) {
-        bar.innerHTML = '';
-        bar.classList.add('hidden');
-        return;
+    if (updateHash) window.location.hash = tab;
+
+    validTabs.forEach(t => {
+        document.getElementById(`panel-${t}`)?.classList.add('hidden');
+        document.getElementById(`tab-${t}`)?.classList.remove('tab-active');
+    });
+
+    document.getElementById(`panel-${tab}`)?.classList.remove('hidden');
+    document.getElementById(`tab-${tab}`)?.classList.add('tab-active');
+
+    if (tab === 'kanban') loadPersonalTasks();
+    else if (tab === 'coletivo') loadCollectiveTasks();
+    else if (tab === 'historico') loadHistory();
+}
+
+// ─── Meu Kanban ──────────────────────────────────────────────────────────
+
+async function loadPersonalTasks() {
+    const todoCol = document.getElementById('personal-todo-tasks');
+    const doingCol = document.getElementById('personal-doing-tasks');
+    const validatingCol = document.getElementById('personal-validating-tasks');
+    if (!todoCol) return;
+
+    const loading = '<p class="text-xs text-[#444444] text-center py-4">Carregando...</p>';
+    todoCol.innerHTML = loading;
+    doingCol.innerHTML = loading;
+    validatingCol.innerHTML = loading;
+
+    const tasks = await DevDeck.fetchApi('/tasks/my-tasks');
+    todoCol.innerHTML = '';
+    doingCol.innerHTML = '';
+    validatingCol.innerHTML = '';
+
+    const hasValidating = (tasks || []).some(t => t.requiresValidation && t.status === 'DOING');
+
+    if (!hasValidating) {
+        validatingCol.innerHTML = '<p class="text-xs text-[#444444] text-center py-6">Tasks que requerem<br>validação antes de concluir</p>';
     }
 
-    const companies = {};
-    ticketTasks.forEach(t => {
-        const c = t.requester?.company || 'Sem empresa';
-        companies[c] = (companies[c] || 0) + 1;
-    });
-
-    bar.classList.remove('hidden');
-    bar.innerHTML = '';
-
-    const allTab = document.createElement('button');
-    allTab.className = 'company-filter-tab active';
-    allTab.textContent = `Todos (${ticketTasks.length})`;
-    allTab.onclick = () => setCompanyFilter('all', bar);
-    bar.appendChild(allTab);
-
-    Object.entries(companies).sort().forEach(([company, count]) => {
-        const tab = document.createElement('button');
-        tab.className = 'company-filter-tab';
-        tab.textContent = `${company} (${count})`;
-        tab.dataset.company = company;
-        tab.onclick = () => setCompanyFilter(company, bar);
-        bar.appendChild(tab);
-    });
-}
-
-function setCompanyFilter(company, bar) {
-    activeCompanyFilter = company;
-    bar.querySelectorAll('.company-filter-tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.company === company || (company === 'all' && !t.dataset.company));
-    });
-    document.querySelectorAll('[data-company]').forEach(el => {
-        if (company === 'all') {
-            el.style.display = '';
-        } else {
-            el.style.display = (el.dataset.company === company) ? '' : 'none';
+    (tasks || []).forEach(task => {
+        const el = createPersonalTaskCard(task);
+        if (task.requiresValidation && task.status === 'DOING') {
+            validatingCol.appendChild(el);
+        } else if (task.status === 'TODO') {
+            todoCol.appendChild(el);
+        } else if (task.status === 'DOING') {
+            doingCol.appendChild(el);
         }
     });
+
+    setupPersonalDragAndDrop();
 }
 
-function createTaskElement(task) {
+function createPersonalTaskCard(task) {
     const div = document.createElement('div');
     div.dataset.taskId = task.id;
     div.dataset.priority = task.priority || 'MEDIUM';
-    if (task.isTicket) div.dataset.company = task.requester?.company || '';
+    div.dataset.requiresValidation = task.requiresValidation ? 'true' : 'false';
     div.draggable = true;
 
     let innerHTML = '';
 
     if (task.isTicket) {
-        // Left border color based on assignment state
         const borderColor = task.assignedUserId ? '#3a3a3a' : '#5c4200';
         div.className = 'task-card p-3 rounded-lg mb-2 cursor-pointer border-l-2';
         div.style.borderLeftColor = borderColor;
@@ -258,7 +208,7 @@ function createTaskElement(task) {
             badges.push(`<span class="text-[10px] px-2 py-0.5 bg-white/10 text-[#e0e0e0] rounded-full font-medium">${escapeHtml(task.requester.company)}</span>`);
         }
         if (task.category) {
-            badges.push(`<span class="text-[10px] px-2 py-0.5 bg-white/5 text-[#888888] rounded-full">${escapeHtml(task.category)}</span>`);
+            badges.push(`<span class="text-[10px] px-2 py-0.5 rounded-full ${getCategoryStyle(task.category)}">${escapeHtml(task.category)}</span>`);
         }
         if (badges.length > 0) {
             innerHTML += `<div class="flex flex-wrap gap-1 mb-2">${badges.join('')}</div>`;
@@ -273,13 +223,12 @@ function createTaskElement(task) {
             }
         }
 
-        // Footer: solicitante | responsável
         const requesterName = task.requesterName || task.requester?.name || '—';
         let assigneeBadge;
         if (task.assignedUser) {
             const initials = task.assignedUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
             assigneeBadge = `<div class="flex items-center gap-1.5 flex-shrink-0">
-                <div class="w-5 h-5 rounded-full bg-white flex items-center justify-center text-black text-[9px] font-bold leading-none">${initials}</div>
+                <div class="w-5 h-5 rounded-full bg-white flex items-center justify-center text-black text-[9px] font-bold">${initials}</div>
                 <span class="text-xs text-white font-medium truncate max-w-[90px]">${escapeHtml(task.assignedUser.name)}</span>
             </div>`;
         } else {
@@ -291,18 +240,16 @@ function createTaskElement(task) {
 
         innerHTML += `<div class="flex items-center justify-between gap-2 pt-2 border-t border-[#2a2a2a]">
             <div class="flex items-center gap-1.5 min-w-0">
-                <svg class="w-3 h-3 flex-shrink-0" style="color:#444444" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3 h-3 flex-shrink-0 text-[#444444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                 </svg>
-                <span class="text-xs truncate" style="color:#555555">${escapeHtml(requesterName)}</span>
+                <span class="text-xs truncate text-[#555555]">${escapeHtml(requesterName)}</span>
             </div>
             ${assigneeBadge}
         </div>`;
 
     } else {
-        // Card de tarefa normal
         div.className = 'task-card p-3 rounded-lg mb-2 cursor-pointer';
-
         innerHTML += `<h4 class="text-sm font-medium text-white">${escapeHtml(task.title)}</h4>`;
 
         if (task.tags) {
@@ -321,44 +268,272 @@ function createTaskElement(task) {
         }
     }
 
+    if (task.requiresValidation) {
+        innerHTML += `<div class="mt-2">
+            <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border" style="background:rgba(176,120,0,0.1);color:#b07800;border-color:rgba(176,120,0,0.3)">
+                ⚠ Requer Validação
+            </span>
+        </div>`;
+    }
+
     div.innerHTML = innerHTML;
-    div.onclick = () => { if(typeof openTaskModal === 'function') openTaskModal(task); };
-    div.ondragstart = function() { draggedTaskElement = this; this.style.opacity = '0.5'; };
-    div.ondragend = function() { this.style.opacity = '1'; draggedTaskElement = null; };
+    div.onclick = () => { if (typeof openTaskModal === 'function') openTaskModal(task); };
+    div.ondragstart = function () { draggedTaskElement = this; this.style.opacity = '0.5'; };
+    div.ondragend = function () { this.style.opacity = '1'; draggedTaskElement = null; };
+
     return div;
 }
 
-async function handleDeleteBoard(id, name) {
-    if(confirm(`Excluir "${name}"?`)) {
-        await DevDeck.fetchApi(`/boards/${id}`, { method: 'DELETE' });
-        if (typeof currentGroupId !== 'undefined' && currentGroupId) await loadGroupBoards(currentGroupId);
-        else await loadPersonalBoards();
-    }
-}
-
-function setupDragAndDrop() {
-    document.querySelectorAll('.tasks').forEach(col => {
+function setupPersonalDragAndDrop() {
+    ['personal-todo-tasks', 'personal-doing-tasks', 'personal-validating-tasks'].forEach(colId => {
+        const col = document.getElementById(colId);
+        if (!col) return;
         col.ondragover = e => e.preventDefault();
         col.ondrop = async e => {
             e.preventDefault();
-            if(!draggedTaskElement) return;
+            if (!draggedTaskElement) return;
+            const status = colId === 'personal-todo-tasks' ? 'TODO' : 'DOING';
             col.appendChild(draggedTaskElement);
-            const status = col.id.replace('-tasks', '').toUpperCase();
+            draggedTaskElement.dataset.requiresValidation = 'false'; // mover de volta desbloqueia
             await DevDeck.fetchApi(`/tasks/${draggedTaskElement.dataset.taskId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status })
             });
         };
     });
+
+    const zone = document.getElementById('completion-zone');
+    if (!zone) return;
+
+    zone.ondragover = e => {
+        e.preventDefault();
+        if (draggedTaskElement?.dataset.requiresValidation === 'true') {
+            zone.classList.add('completion-zone-blocked');
+        } else {
+            zone.classList.add('completion-zone-hover');
+        }
+    };
+
+    zone.ondragleave = () => {
+        zone.classList.remove('completion-zone-hover', 'completion-zone-blocked');
+    };
+
+    zone.ondrop = async e => {
+        e.preventDefault();
+        zone.classList.remove('completion-zone-hover', 'completion-zone-blocked');
+        if (!draggedTaskElement) return;
+
+        if (draggedTaskElement.dataset.requiresValidation === 'true') {
+            alert('Este ticket requer validação antes de ser concluído.\nAbra o ticket e desmarque "Requer Validação" para poder concluir.');
+            return;
+        }
+
+        const taskId = draggedTaskElement.dataset.taskId;
+        draggedTaskElement.remove();
+        historyData = null; // limpar cache do histórico
+
+        await DevDeck.fetchApi(`/tasks/${taskId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'DONE' })
+        });
+    };
 }
 
-function showNoBoardsMessage() {
-    document.getElementById('kanban-board').classList.add('hidden');
-    document.getElementById('no-boards-message').classList.remove('hidden');
+// ─── Kanban Coletivo ─────────────────────────────────────────────────────
+
+async function loadCollectiveTasks() {
+    const col = document.getElementById('collective-available-tasks');
+    if (!col) return;
+
+    col.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Carregando...</p>';
+
+    const tasks = await DevDeck.fetchApi('/tasks/unassigned');
+
+    if (!tasks || tasks.length === 0) {
+        col.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Nenhuma tarefa disponível no momento.</p>';
+        return;
+    }
+
+    col.innerHTML = '';
+    tasks.forEach(task => col.appendChild(createCollectiveTaskCard(task)));
 }
 
-// Exports
+function createCollectiveTaskCard(task) {
+    const div = document.createElement('div');
+    div.dataset.taskId = task.id;
+    div.dataset.priority = task.priority || 'MEDIUM';
+    div.className = 'task-card p-4 rounded-xl cursor-default';
+
+    let html = '';
+
+    if (task.board?.group?.name) {
+        html += `<div class="mb-2">
+            <span class="text-[10px] px-2 py-0.5 bg-white/5 text-[#888888] rounded-full border border-[#2a2a2a]">${escapeHtml(task.board.group.name)}</span>
+        </div>`;
+    }
+
+    if (task.isTicket) {
+        const badges = [];
+        if (task.requester?.company) badges.push(`<span class="text-[10px] px-2 py-0.5 bg-white/10 text-[#e0e0e0] rounded-full">${escapeHtml(task.requester.company)}</span>`);
+        if (task.category) badges.push(`<span class="text-[10px] px-2 py-0.5 rounded-full ${getCategoryStyle(task.category)}">${escapeHtml(task.category)}</span>`);
+        if (badges.length) html += `<div class="flex flex-wrap gap-1 mb-2">${badges.join('')}</div>`;
+    }
+
+    html += `<h4 class="text-sm font-medium text-white mb-1">${escapeHtml(task.title)}</h4>`;
+
+    if (task.description) {
+        html += `<p class="text-xs text-[#888888] mb-3 line-clamp-2">${escapeHtml(task.description)}</p>`;
+    }
+
+    const priorityColors = { URGENT: '#7a1e1e', HIGH: '#5a3a00', MEDIUM: '#2a2a2a', LOW: '#1e3a2a' };
+    const priorityLabels = { URGENT: 'Urgente', HIGH: 'Alta', MEDIUM: 'Média', LOW: 'Baixa' };
+    const pColor = priorityColors[task.priority] || priorityColors.MEDIUM;
+    const pLabel = priorityLabels[task.priority] || 'Média';
+
+    html += `<div class="flex items-center justify-between mt-3 pt-3 border-t border-[#2a2a2a] gap-2">
+        <span class="text-[10px] px-2 py-0.5 rounded text-[#888888] border border-[#2a2a2a]">${pLabel}</span>
+        <button class="pickup-btn" onclick="pickupTask(${task.id}, this)">Pegar Tarefa</button>
+    </div>`;
+
+    div.innerHTML = html;
+    div.addEventListener('click', e => {
+        if (!e.target.closest('.pickup-btn') && typeof openTaskModal === 'function') openTaskModal(task);
+    });
+
+    return div;
+}
+
+async function pickupTask(taskId, btn) {
+    const userData = DevDeck.getUserData();
+    if (!userData || !userData.id) { alert('Usuário não identificado.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Pegando...';
+
+    try {
+        await DevDeck.fetchApi(`/tasks/${taskId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ assignedUserId: userData.id })
+        });
+
+        const card = btn.closest('[data-task-id]');
+        if (card) {
+            card.style.transition = 'opacity 0.3s';
+            card.style.opacity = '0';
+            setTimeout(() => card.remove(), 300);
+        }
+    } catch (error) {
+        alert('Erro ao pegar tarefa: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = 'Pegar Tarefa';
+    }
+}
+
+// ─── Histórico ───────────────────────────────────────────────────────────
+
+async function loadHistory(query = '') {
+    const container = document.getElementById('history-cards');
+    if (!container) return;
+
+    if (!historyData) {
+        container.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Carregando...</p>';
+        const data = await DevDeck.fetchApi('/tasks/history');
+        historyData = data || [];
+        setupHistorySearch();
+    }
+
+    const q = query.toLowerCase();
+    const filtered = q
+        ? historyData.filter(t =>
+            t.title.toLowerCase().includes(q) ||
+            (t.assignedUser?.name || '').toLowerCase().includes(q) ||
+            (t.category || '').toLowerCase().includes(q) ||
+            (t.requester?.company || '').toLowerCase().includes(q)
+        )
+        : historyData;
+
+    container.innerHTML = '';
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Nenhum ticket encontrado no histórico.</p>';
+        return;
+    }
+
+    filtered.forEach(task => container.appendChild(createHistoryCard(task)));
+}
+
+function createHistoryCard(task) {
+    const div = document.createElement('div');
+    div.className = 'history-card';
+
+    const completedAt = task.updatedAt ? new Date(task.updatedAt) : null;
+    const timeAgo = completedAt ? formatTimeAgo(completedAt) : '';
+    const assigneeName = task.assignedUser?.name || 'Sem responsável';
+    const initials = task.assignedUser
+        ? task.assignedUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        : '?';
+
+    const badges = [];
+    if (task.requester?.company) badges.push(`<span class="text-[10px] px-2 py-0.5 bg-white/10 text-[#e0e0e0] rounded-full">${escapeHtml(task.requester.company)}</span>`);
+    if (task.category) badges.push(`<span class="text-[10px] px-2 py-0.5 bg-white/5 text-[#888888] rounded-full">${escapeHtml(task.category)}</span>`);
+
+    div.innerHTML = `
+        ${badges.length ? `<div class="flex flex-wrap gap-1 mb-2">${badges.join('')}</div>` : ''}
+        <h4 class="text-sm font-medium text-white mb-1 leading-snug">${escapeHtml(task.title)}</h4>
+        ${task.description ? `<p class="text-xs text-[#888888] mb-3 line-clamp-2">${escapeHtml(task.description)}</p>` : ''}
+        <div class="flex items-center justify-between pt-2 border-t border-[#2a2a2a] mt-auto gap-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+                <div class="w-5 h-5 rounded-full bg-[#2a2a2a] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">${initials}</div>
+                <span class="text-xs text-[#888888] truncate">${escapeHtml(assigneeName)}</span>
+            </div>
+            <span class="text-[10px] text-[#555555] flex-shrink-0">${timeAgo}</span>
+        </div>
+    `;
+
+    div.onclick = () => { if (typeof openTaskModal === 'function') openTaskModal(task); };
+    return div;
+}
+
+function setupHistorySearch() {
+    const input = document.getElementById('history-search');
+    if (!input || input._historyBound) return;
+    input._historyBound = true;
+    let debounce;
+    input.addEventListener('input', () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => loadHistory(input.value), 250);
+    });
+}
+
+function formatTimeAgo(date) {
+    const diff = (Date.now() - date.getTime()) / 1000;
+    if (diff < 60) return 'agora';
+    if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d atrás`;
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+// ─── Compatibilidade / Exports ─────────────────────────────────────────
+
+// loadTasks ainda usado por kanban-modals.js após salvar
+async function loadTasks() {
+    await loadPersonalTasks();
+    historyData = null;
+}
+
+// renderBoardSelectors: não mais usada mas mantida para evitar erro em kanban-board-modal
+function renderBoardSelectors(boards) { /* no-op */ }
+
+// Compatibilidade com component-updates.js (addTaskToKanban usa createTaskElement)
+window.createTaskElement = createPersonalTaskCard;
+
 window.loadPersonalBoards = loadPersonalBoards;
 window.loadGroupBoards = loadGroupBoards;
 window.loadTasks = loadTasks;
+window.loadPersonalTasks = loadPersonalTasks;
+window.loadCollectiveTasks = loadCollectiveTasks;
+window.loadHistory = loadHistory;
 window.handleDeleteBoard = handleDeleteBoard;
+window.pickupTask = pickupTask;
+window.invalidateHistoryCache = () => { historyData = null; };

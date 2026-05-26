@@ -137,6 +137,10 @@ export class UpdateTaskDto {
   @IsString()
   @IsOptional()
   category?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  requiresValidation?: boolean;
 }
 
 // Mantive Subtasks igual

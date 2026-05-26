@@ -79,6 +79,24 @@ export class TaskController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('my-tasks')
+  findMyTasks(@Req() req) {
+    return this.taskService.findMyAssignedTasks(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('unassigned')
+  findUnassigned(@Req() req) {
+    return this.taskService.findUnassignedGroupTasks(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('history')
+  findHistory(@Req() req) {
+    return this.taskService.findCompletedTasks(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(@Query('boardId') boardId: string) {
     return this.taskService.findAll(+boardId);

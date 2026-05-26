@@ -42,7 +42,7 @@ export class NotificationService {
 
       const groupIds = user.groupMembers.map((gm) => gm.groupId);
 
-      const pendingTasks = await this.prisma.task.findMany({
+      const pendingTasks = await this.prisma.ticket.findMany({
         where: {
           status: { not: 'DONE' },
           board: {
@@ -109,7 +109,7 @@ export class NotificationService {
     this.logger.log('Verificando tarefas paradas...');
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
 
-    const staleTasks = await this.prisma.task.findMany({
+    const staleTasks = await this.prisma.ticket.findMany({
       where: {
         status: 'DOING',
         updatedAt: { lt: twoDaysAgo },
@@ -202,7 +202,7 @@ export class NotificationService {
     }
 
     if (staleTasks.length > 0) {
-      await this.prisma.task.updateMany({
+      await this.prisma.ticket.updateMany({
         where: { id: { in: staleTasks.map((t) => t.id) } },
         data: { updatedAt: new Date() },
       });

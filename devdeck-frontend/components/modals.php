@@ -1,84 +1,140 @@
 <div id="task-modal" class="modal fixed inset-0 flex items-center justify-center z-40 hidden">
     <div class="modal-backdrop absolute inset-0 bg-black/60"></div>
     <div class="modal-content relative p-6 rounded-xl w-full max-w-lg mx-4 bg-[#141414] border border-[#2a2a2a] shadow-2xl max-h-[90vh] overflow-y-auto">
-        <h3 id="modal-title" class="text-xl font-semibold mb-4 text-white">Nova Tarefa</h3>
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="modal-title" class="text-xl font-semibold text-white">Nova Tarefa</h3>
+            <span id="modal-category-badge" class="hidden text-xs font-medium px-2.5 py-1 rounded-full bg-[#2a2a2a] border border-[#404040] text-[#cccccc]"></span>
+        </div>
+
+        <!-- Abas internas do modal -->
+        <div class="flex gap-0 mb-5 border-b border-[#2a2a2a]">
+            <button type="button" id="modal-tab-principal" class="modal-inner-tab modal-inner-tab-active px-4 py-2 text-sm font-medium">Principal</button>
+            <button type="button" id="modal-tab-detalhes" class="modal-inner-tab px-4 py-2 text-sm font-medium">Detalhes</button>
+            <button type="button" id="modal-tab-atribuicao" class="modal-inner-tab px-4 py-2 text-sm font-medium">Atribuição</button>
+        </div>
+
         <form id="task-form">
             <input type="hidden" id="task-id">
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div class="md:col-span-2">
-                    <label for="task-title" class="block text-xs font-medium text-[#888888] mb-1">Título</label>
-                    <input type="text" id="task-title" name="title" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none" required maxlength="255">
-                </div>
-                <div>
-                    <label for="task-status" class="block text-xs font-medium text-[#888888] mb-1">Status</label>
-                    <select id="task-status" name="status" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
-                        <option value="TODO">A Fazer</option>
-                        <option value="DOING">Em Progresso</option>
-                        <option value="DONE">Concluído</option>
-                    </select>
-                </div>
-            </div>
+            <!-- ── ABA PRINCIPAL ── -->
+            <div id="modal-panel-principal">
 
-            <!-- Info do solicitante (apenas para tickets) -->
-            <div id="ticket-info-section" class="mb-4 p-3 bg-[#1c1c1c] rounded-lg border border-[#2a2a2a] hidden">
-                <p class="text-xs font-semibold text-[#888888] mb-2 uppercase tracking-wider">Informações do Ticket</p>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <p class="text-xs text-[#555555]">Solicitante</p>
-                        <p id="ticket-requester-name" class="text-sm text-white font-medium"></p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="md:col-span-2">
+                        <label for="task-title" class="block text-xs font-medium text-[#888888] mb-1">Título</label>
+                        <input type="text" id="task-title" name="title" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none" required maxlength="255">
                     </div>
                     <div>
-                        <p class="text-xs text-[#555555]">Empresa</p>
-                        <p id="ticket-requester-company" class="text-sm text-white font-medium"></p>
-                    </div>
-                    <div class="col-span-2">
-                        <p class="text-xs text-[#555555]">Categoria</p>
-                        <p id="ticket-category-display" class="text-sm text-white"></p>
+                        <label for="task-status" class="block text-xs font-medium text-[#888888] mb-1">Status</label>
+                        <select id="task-status" name="status" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
+                            <option value="TODO">A Fazer</option>
+                            <option value="DOING">Em Progresso</option>
+                            <option value="DONE">Concluído</option>
+                        </select>
                     </div>
                 </div>
-            </div>
 
-            <div class="mb-4">
-                <label for="task-assigned-user" class="block text-xs font-medium text-[#888888] mb-1">Responsável</label>
-                <select id="task-assigned-user" name="assignedUserId" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
-                    <option value="">Ninguém atribuído</option>
-                </select>
-            </div>
+                <div class="mb-4">
+                    <label for="task-description" class="block text-xs font-medium text-[#888888] mb-1">Descrição</label>
+                    <textarea id="task-description" name="description" rows="5" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none resize-none" maxlength="2000"></textarea>
+                </div>
 
-            <div class="mb-4">
-                <label for="task-description" class="block text-xs font-medium text-[#888888] mb-1">Descrição</label>
-                <textarea id="task-description" name="description" rows="3" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none resize-none" maxlength="1000"></textarea>
-            </div>
+                <!-- Subtasks — apenas para DEV -->
+                <div id="subtasks-section" class="mb-4 hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-medium text-[#888888] uppercase tracking-wider">Subtasks</label>
+                        <button type="button" id="add-subtask-btn" class="text-xs text-[#888888] hover:text-white flex items-center gap-1 transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Adicionar
+                        </button>
+                    </div>
+                    <div id="subtasks-list" class="space-y-1.5"></div>
+                    <div id="subtask-input-row" class="hidden mt-2 flex gap-2">
+                        <input type="text" id="new-subtask-input" placeholder="Descrição da subtask..." maxlength="200"
+                            class="flex-1 bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-sm text-white placeholder-[#555] focus:border-white focus:outline-none">
+                        <button type="button" id="confirm-subtask-btn" class="px-3 py-1.5 bg-white text-black text-xs font-semibold rounded hover:bg-[#e0e0e0] transition-colors">OK</button>
+                        <button type="button" id="cancel-subtask-btn" class="px-3 py-1.5 text-[#888] hover:text-white text-xs transition-colors">✕</button>
+                    </div>
+                </div>
 
-            <div class="grid grid-cols-2 gap-4 mb-4">
+            </div><!-- /modal-panel-principal -->
+
+            <!-- ── ABA DETALHES ── -->
+            <div id="modal-panel-detalhes" class="hidden">
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="task-priority" class="block text-xs font-medium text-[#888888] mb-1">Prioridade</label>
+                        <select id="task-priority" name="priority" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
+                            <option value="LOW">🟢 Baixa</option>
+                            <option value="MEDIUM" selected>🟡 Média</option>
+                            <option value="HIGH">🟠 Alta</option>
+                            <option value="URGENT">🔴 Urgente</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="task-duedate" class="block text-xs font-medium text-[#888888] mb-1">Prazo de Entrega</label>
+                        <input type="date" id="task-duedate" name="dueDate" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none [color-scheme:dark]">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="task-time" class="block text-xs font-medium text-[#888888] mb-1">Tempo Estimado (h)</label>
+                        <input type="number" id="task-time" name="estimatedTime" placeholder="Ex: 4" min="0" step="0.5" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label for="task-tags" class="block text-xs font-medium text-[#888888] mb-1">Tags (separadas por vírgula)</label>
+                        <input type="text" id="task-tags" name="tags" placeholder="bug, front, urgente" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Requer Validação -->
+                <div class="flex items-center justify-between p-3 bg-[#1c1c1c] rounded-lg border border-[#2a2a2a]">
+                    <div>
+                        <span class="text-sm font-medium text-white">Requer Validação</span>
+                        <p class="text-xs text-[#555555] mt-0.5">Impede concluir sem validação de outro membro</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="task-requires-validation" class="sr-only peer">
+                        <div class="w-9 h-5 bg-[#2a2a2a] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#404040] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                    </label>
+                </div>
+
+            </div><!-- /modal-panel-detalhes -->
+
+            <!-- ── ABA ATRIBUIÇÃO ── -->
+            <div id="modal-panel-atribuicao" class="hidden">
+
+                <!-- Info do solicitante (apenas para tickets) -->
+                <div id="ticket-info-section" class="mb-4 p-3 bg-[#1c1c1c] rounded-lg border border-[#2a2a2a] hidden">
+                    <p class="text-xs font-semibold text-[#888888] mb-2 uppercase tracking-wider">Informações do Ticket</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <p class="text-xs text-[#555555]">Solicitante</p>
+                            <p id="ticket-requester-name" class="text-sm text-white font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-[#555555]">Empresa</p>
+                            <p id="ticket-requester-company" class="text-sm text-white font-medium"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <p class="text-xs text-[#555555]">Categoria</p>
+                            <p id="ticket-category-display" class="text-sm text-white"></p>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
-                    <label for="task-priority" class="block text-xs font-medium text-[#888888] mb-1">Prioridade</label>
-                    <select id="task-priority" name="priority" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
-                        <option value="LOW">🟢 Baixa</option>
-                        <option value="MEDIUM" selected>🟡 Média</option>
-                        <option value="HIGH">🟠 Alta</option>
-                        <option value="URGENT">🔴 Urgente</option>
+                    <label for="task-assigned-user" class="block text-xs font-medium text-[#888888] mb-1">Responsável</label>
+                    <select id="task-assigned-user" name="assignedUserId" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
+                        <option value="">Ninguém atribuído</option>
                     </select>
                 </div>
-                <div>
-                    <label for="task-duedate" class="block text-xs font-medium text-[#888888] mb-1">Prazo de Entrega</label>
-                    <input type="datetime-local" id="task-duedate" name="dueDate" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none [color-scheme:dark]">
-                </div>
-            </div>
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label for="task-time" class="block text-xs font-medium text-[#888888] mb-1">Tempo Estimado (min)</label>
-                    <input type="number" id="task-time" name="estimatedTime" placeholder="Ex: 60" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
-                </div>
-                <div>
-                    <label for="task-tags" class="block text-xs font-medium text-[#888888] mb-1">Tags (separadas por vírgula)</label>
-                    <input type="text" id="task-tags" name="tags" placeholder="bug, front, urgente" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none">
-                </div>
-            </div>
+            </div><!-- /modal-panel-atribuicao -->
 
-            <div class="flex justify-end gap-3 pt-4 border-t border-[#2a2a2a]">
+            <div class="flex justify-end gap-3 pt-4 mt-4 border-t border-[#2a2a2a]">
                 <button type="button" id="modal-cancel" class="px-4 py-2 text-[#888888] hover:text-white transition-colors">Cancelar</button>
                 <button type="button" id="modal-delete" class="bg-red-900/40 hover:bg-red-800/60 text-red-300 py-2 px-4 rounded border border-red-900/50 hidden transition-colors">Excluir</button>
                 <button type="submit" id="modal-save" class="bg-white hover:bg-[#e0e0e0] text-black font-semibold py-2 px-6 rounded transition-colors">Salvar Tarefa</button>

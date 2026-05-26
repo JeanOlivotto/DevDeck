@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     DevDeck.setAuthToken(data.access_token);
 
                     if (data.user) {
-                        DevDeck.setUserData(data.user.email, data.user.name);
+                        DevDeck.setUserData(data.user.email, data.user.name, data.user.id, data.user.isDevTeam || false);
                     }
 
                     // Sincronizar session PHP com o token JWT
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     DevDeck.setAuthToken(data.access_token);
 
                     if (data.user) {
-                        DevDeck.setUserData(data.user.email, data.user.name);
+                        DevDeck.setUserData(data.user.email, data.user.name, data.user.id, data.user.isDevTeam || false);
                     }
 
                     // Sincronizar session PHP com o token JWT

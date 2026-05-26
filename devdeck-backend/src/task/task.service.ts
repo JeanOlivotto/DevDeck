@@ -24,20 +24,16 @@ export class TaskService {
   ) {}
 
   async create(createTaskDto: CreateTaskDto, userId: number) {
-    return this.prisma.task.create({
+    return this.prisma.ticket.create({
       data: {
         title: createTaskDto.title,
         description: createTaskDto.description,
         status: createTaskDto.status || 'TODO',
         boardId: createTaskDto.boardId,
-
         priority: createTaskDto.priority || 'MEDIUM',
         dueDate: createTaskDto.dueDate,
         estimatedTime: createTaskDto.estimatedTime,
         tags: createTaskDto.tags,
-
-        // Se quiser atribuir ao criador:
-        // assignedUserId: userId
       },
     });
   }
@@ -59,7 +55,7 @@ export class TaskService {
       ? JSON.stringify(files.map((f) => `/uploads/${f.filename}`))
       : null;
 
-    return this.prisma.task.create({
+    return this.prisma.ticket.create({
       data: {
         title: createTicketDto.title,
         description: createTicketDto.description,
@@ -97,7 +93,7 @@ export class TaskService {
       ? JSON.stringify(files.map((f) => `/uploads/${f.filename}`))
       : null;
 
-    return this.prisma.task.create({
+    return this.prisma.ticket.create({
       data: {
         title: dto.title,
         description: dto.description,
@@ -116,7 +112,7 @@ export class TaskService {
   }
 
   async findMyTickets(userId: number) {
-    return this.prisma.task.findMany({
+    return this.prisma.ticket.findMany({
       where: { requesterUserId: userId },
       select: {
         id: true,
@@ -136,7 +132,7 @@ export class TaskService {
   }
 
   async findAll(boardId: number) {
-    return this.prisma.task.findMany({
+    return this.prisma.ticket.findMany({
       where: { boardId },
       include: {
         subtasks: { orderBy: { id: 'asc' } },
@@ -150,22 +146,22 @@ export class TaskService {
   }
 
   async findOne(id: number) {
-    const task = await this.prisma.task.findUnique({
+    const ticket = await this.prisma.ticket.findUnique({
       where: { id },
       include: {
         subtasks: true,
         assignedUser: { select: { id: true, name: true, email: true } },
       },
     });
-    if (!task) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
+    if (!ticket) {
+      throw new NotFoundException(`Ticket with ID ${id} not found`);
     }
-    return task;
+    return ticket;
   }
 
   async update(id: number, updateTaskDto: UpdateTaskDto) {
     const existing = await this.findOne(id);
-    const updated = await this.prisma.task.update({
+    const updated = await this.prisma.ticket.update({
       where: { id },
       data: updateTaskDto,
     });
@@ -195,15 +191,15 @@ export class TaskService {
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.task.delete({
+    return this.prisma.ticket.delete({
       where: { id },
     });
   }
 
-  async createSubtask(taskId: number, createSubtaskDto: CreateSubtaskDto) {
+  async createSubtask(ticketId: number, createSubtaskDto: CreateSubtaskDto) {
     return this.prisma.subtask.create({
       data: {
-        taskId,
+        ticketId,
         title: createSubtaskDto.title,
         completed: createSubtaskDto.completed || false,
       },
@@ -211,19 +207,95 @@ export class TaskService {
   }
 
   async updateSubtask(
-    taskId: number,
+    ticketId: number,
     subtaskId: number,
     updateSubtaskDto: UpdateSubtaskDto,
   ) {
     return this.prisma.subtask.update({
-      where: { id: subtaskId, taskId },
+      where: { id: subtaskId, ticketId },
       data: updateSubtaskDto,
     });
   }
 
-  async removeSubtask(taskId: number, subtaskId: number) {
+  async removeSubtask(ticketId: number, subtaskId: number) {
     return this.prisma.subtask.delete({
-      where: { id: subtaskId, taskId },
+      where: { id: subtaskId, ticketId },
+    });
+  }
+
+  async findMyAssignedTasks(userId: number) {
+    return this.prisma.ticket.findMany({
+      where: { assignedUserId: userId, status: { not: 'DONE' } },
+      include: {
+        subtasks: { orderBy: { id: 'asc' } },
+        assignedUser: { select: { id: true, name: true, email: true } },
+        requester: {
+          select: { id: true, name: true, email: true, company: true },
+        },
+        board: { select: { id: true, name: true, groupId: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async findUnassignedGroupTasks(userId: number) {
+    return this.prisma.ticket.findMany({
+      where: {
+        assignedUserId: null,
+        status: { not: 'DONE' },
+        OR: [
+          {
+            board: {
+              type: 'group',
+              group: {
+                members: { some: { userId, inviteStatus: 'accepted' } },
+              },
+            },
+          },
+          { board: { isMainTicketBoard: true } },
+        ],
+      },
+      include: {
+        subtasks: { orderBy: { id: 'asc' } },
+        requester: {
+          select: { id: true, name: true, email: true, company: true },
+        },
+        board: {
+          select: {
+            id: true,
+            name: true,
+            group: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async findCompletedTasks(userId: number) {
+    return this.prisma.ticket.findMany({
+      where: {
+        status: 'DONE',
+        board: {
+          OR: [
+            { userId },
+            {
+              type: 'group',
+              group: {
+                members: { some: { userId, inviteStatus: 'accepted' } },
+              },
+            },
+          ],
+        },
+      },
+      include: {
+        assignedUser: { select: { id: true, name: true, email: true } },
+        requester: {
+          select: { id: true, name: true, email: true, company: true },
+        },
+        board: { select: { id: true, name: true, groupId: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 }

@@ -23,8 +23,8 @@ model User {
   boards             Board[]
   groupMembers       GroupMember[]
   groupsOwned        Group[]       @relation("groupOwner")
-  assignedTasks      Task[]
-  requestedTasks     Task[]        @relation("requester")
+  assignedTickets    Ticket[]
+  requestedTickets   Ticket[]      @relation("requester")
 
   @@map("users")
 }
@@ -44,7 +44,7 @@ model Board {
   isMainTicketBoard   Boolean  @default(false)
   group               Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks               Task[]
+  tickets             Ticket[]
 
   @@unique([name, userId, groupId])
   @@index([userId], map: "boards_userId_fkey")
@@ -84,45 +84,46 @@ model GroupMember {
   @@map("group_members")
 }
 
-model Task {
-  id             Int       @id @default(autoincrement())
-  title          String
-  description    String?
-  status         String    @default("TODO")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  boardId        Int
-  assignedUserId Int?
-  priority       String    @default("MEDIUM")
-  estimatedTime  Int?
-  dueDate        DateTime?
-  tags           String?
-  isTicket         Boolean   @default(false)
-  requesterName    String?
-  requesterEmail   String?
-  requesterUserId  Int?
-  category         String?
-  attachments      String?
-  subtasks         Subtask[]
-  assignedUser     User?     @relation(fields: [assignedUserId], references: [id])
-  requester        User?     @relation("requester", fields: [requesterUserId], references: [id])
-  board            Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+model Ticket {
+  id                 Int       @id @default(autoincrement())
+  title              String
+  description        String?
+  status             String    @default("TODO")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  boardId            Int
+  assignedUserId     Int?
+  priority           String    @default("MEDIUM")
+  estimatedTime      Int?
+  dueDate            DateTime?
+  tags               String?
+  isTicket           Boolean   @default(false)
+  requiresValidation Boolean   @default(false)
+  requesterName      String?
+  requesterEmail     String?
+  requesterUserId    Int?
+  category           String?
+  attachments        String?
+  subtasks           Subtask[]
+  assignedUser       User?     @relation(fields: [assignedUserId], references: [id])
+  requester          User?     @relation("requester", fields: [requesterUserId], references: [id])
+  board              Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
 
   @@index([boardId], map: "tasks_boardId_fkey")
   @@index([assignedUserId], map: "tasks_assignedUserId_fkey")
   @@index([requesterUserId], map: "tasks_requesterUserId_fkey")
-  @@map("tasks")
+  @@map("tickets")
 }
 
 model Subtask {
   id        Int      @id @default(autoincrement())
   title     String
   completed Boolean  @default(false)
-  taskId    Int
+  ticketId  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
-  @@index([taskId], map: "subtasks_taskId_fkey")
+  @@index([ticketId], map: "subtasks_ticketId_fkey")
   @@map("subtasks")
 }

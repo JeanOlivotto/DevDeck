@@ -3,6 +3,7 @@ const TOKEN_KEY = 'devdeck_auth_token';
 const USER_EMAIL_KEY = 'devdeck_user_email';
 const USER_NAME_KEY = 'devdeck_user_name';
 const USER_ID_KEY = 'devdeck_user_id';
+const USER_IS_DEV_KEY = 'devdeck_is_dev_team';
 
 // Funções auxiliares
 function getAuthToken() {
@@ -20,16 +21,14 @@ function clearAuthData() {
     localStorage.removeItem(USER_EMAIL_KEY);
     localStorage.removeItem(USER_NAME_KEY);
     localStorage.removeItem(USER_ID_KEY);
+    localStorage.removeItem(USER_IS_DEV_KEY);
 }
 
-function setUserData(email, name, userId = null) {
-    console.log('setUserData called:', email, name, userId); // DEBUG
+function setUserData(email, name, userId = null, isDevTeam = false) {
     localStorage.setItem(USER_EMAIL_KEY, email);
     localStorage.setItem(USER_NAME_KEY, name);
-    if (userId) {
-        localStorage.setItem(USER_ID_KEY, userId.toString());
-    }
-    console.log('User data saved'); // DEBUG
+    if (userId) localStorage.setItem(USER_ID_KEY, userId.toString());
+    localStorage.setItem(USER_IS_DEV_KEY, isDevTeam ? 'true' : 'false');
 }
 
 function getUserData() {
@@ -37,7 +36,8 @@ function getUserData() {
     return {
         email: localStorage.getItem(USER_EMAIL_KEY),
         name: localStorage.getItem(USER_NAME_KEY),
-        id: id > 0 ? id : null  // Retorna null se ID for inválido
+        id: id > 0 ? id : null,
+        isDevTeam: localStorage.getItem(USER_IS_DEV_KEY) === 'true'
     };
 }
 
