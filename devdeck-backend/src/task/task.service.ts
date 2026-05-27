@@ -1,8 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { PusherService } from '../pusher/pusher.service';
+import { DiscordService } from '../discord/discord.service';
 import {
   CreateSubtaskDto,
+  CreateCommentDto,
   CreateTaskDto,
   CreateEmployeeTicketDto,
   UpdateSubtaskDto,
@@ -21,10 +24,12 @@ export class TaskService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private pusherService: PusherService,
+    private discordService: DiscordService,
   ) {}
 
   async create(createTaskDto: CreateTaskDto, userId: number) {
-    return this.prisma.ticket.create({
+    const ticket = await this.prisma.ticket.create({
       data: {
         title: createTaskDto.title,
         description: createTaskDto.description,
@@ -36,6 +41,8 @@ export class TaskService {
         tags: createTaskDto.tags,
       },
     });
+    this.pusherService.trigger('devdeck-tickets', 'ticket.created', { ticketId: ticket.id, boardId: ticket.boardId });
+    return ticket;
   }
 
   async createPublicTicket(
@@ -55,7 +62,7 @@ export class TaskService {
       ? JSON.stringify(files.map((f) => `/uploads/${f.filename}`))
       : null;
 
-    return this.prisma.ticket.create({
+    const ticket = await this.prisma.ticket.create({
       data: {
         title: createTicketDto.title,
         description: createTicketDto.description,
@@ -70,6 +77,8 @@ export class TaskService {
         attachments,
       },
     });
+    this.pusherService.trigger('devdeck-tickets', 'ticket.created', { ticketId: ticket.id, boardId: ticket.boardId });
+    return ticket;
   }
 
   async createEmployeeTicket(
@@ -93,7 +102,7 @@ export class TaskService {
       ? JSON.stringify(files.map((f) => `/uploads/${f.filename}`))
       : null;
 
-    return this.prisma.ticket.create({
+    const ticket = await this.prisma.ticket.create({
       data: {
         title: dto.title,
         description: dto.description,
@@ -109,6 +118,8 @@ export class TaskService {
         attachments,
       },
     });
+    this.pusherService.trigger('devdeck-tickets', 'ticket.created', { ticketId: ticket.id, boardId: ticket.boardId });
+    return ticket;
   }
 
   async findMyTickets(userId: number) {
@@ -166,6 +177,25 @@ export class TaskService {
       data: updateTaskDto,
     });
 
+    // Discord pessoal ao responsável quando ticket é atribuído
+    if (
+      updateTaskDto.assignedUserId !== undefined &&
+      updateTaskDto.assignedUserId !== null &&
+      updateTaskDto.assignedUserId !== existing.assignedUserId
+    ) {
+      const assignee = await this.prisma.user.findUnique({
+        where: { id: updateTaskDto.assignedUserId },
+      });
+      if (assignee?.discordWebhook) {
+        this.discordService
+          .sendNotification(
+            assignee.discordWebhook,
+            `🎯 **Novo ticket atribuído a você!**\n\n**${existing.title}**\n${existing.description ? existing.description.substring(0, 200) : ''}\n\nAcesse o DevDeck para ver os detalhes.`,
+          )
+          .catch((e) => console.error('Erro Discord assign:', e));
+      }
+    }
+
     if (
       updateTaskDto.status &&
       updateTaskDto.status !== existing.status &&
@@ -186,14 +216,19 @@ export class TaskService {
       }
     }
 
+    this.pusherService.trigger('devdeck-tickets', 'ticket.updated', {
+      ticketId: updated.id,
+      status: updated.status,
+      assignedUserId: updated.assignedUserId,
+    });
     return updated;
   }
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.ticket.delete({
-      where: { id },
-    });
+    const result = await this.prisma.ticket.delete({ where: { id } });
+    this.pusherService.trigger('devdeck-tickets', 'ticket.deleted', { ticketId: id });
+    return result;
   }
 
   async createSubtask(ticketId: number, createSubtaskDto: CreateSubtaskDto) {
@@ -221,6 +256,45 @@ export class TaskService {
     return this.prisma.subtask.delete({
       where: { id: subtaskId, ticketId },
     });
+  }
+
+  async getComments(ticketId: number) {
+    return this.prisma.ticketComment.findMany({
+      where: { ticketId },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async addComment(ticketId: number, userId: number, dto: CreateCommentDto) {
+    const ticket = await this.findOne(ticketId);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado.');
+
+    const comment = await this.prisma.ticketComment.create({
+      data: { ticketId, userId, authorName: user.name, content: dto.content },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    if (ticket.requesterEmail) {
+      const requesterName = ticket.requesterName || 'Cliente';
+      const htmlBody = `<p>Olá <strong>${requesterName}</strong>,</p><p><strong>${user.name}</strong> enviou uma mensagem sobre seu ticket <strong>"${ticket.title}"</strong>:</p><blockquote style="border-left:3px solid #ccc;padding-left:12px;margin:16px 0;color:#333">${dto.content.replace(/\n/g, '<br>')}</blockquote><p>Att,<br>Equipe de Desenvolvimento BJGROUP</p>`;
+      this.emailService
+        .sendEmail(
+          ticket.requesterEmail,
+          `Nova mensagem sobre seu ticket: ${ticket.title}`,
+          `Olá ${requesterName},\n\n${user.name} enviou uma mensagem sobre seu ticket "${ticket.title}":\n\n"${dto.content}"\n\nAtt,\nEquipe de Desenvolvimento BJGROUP`,
+          htmlBody,
+        )
+        .catch((e) => console.error('Erro email comment:', e));
+    }
+
+    this.pusherService.trigger('devdeck-tickets', 'ticket.comment', {
+      ticketId,
+      commentId: comment.id,
+    });
+
+    return comment;
   }
 
   async findMyAssignedTasks(userId: number) {

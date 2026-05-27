@@ -4,7 +4,7 @@ let boardMembers = [];
 let currentModalGroupId = null;
 let currentModalTaskId = null;
 
-const MODAL_TABS = ['principal', 'detalhes', 'atribuicao'];
+const MODAL_TABS = ['principal', 'detalhes', 'atribuicao', 'mensagens'];
 
 function resetModalTabs() {
     switchModalTab('principal');
@@ -15,6 +15,9 @@ function switchModalTab(name) {
         document.getElementById(`modal-panel-${t}`)?.classList.toggle('hidden', t !== name);
         document.getElementById(`modal-tab-${t}`)?.classList.toggle('modal-inner-tab-active', t === name);
     });
+    if (name === 'mensagens' && currentModalTaskId) {
+        loadComments(currentModalTaskId);
+    }
 }
 
 function openTaskModal(task = null, status = 'TODO') {
@@ -27,6 +30,10 @@ function openTaskModal(task = null, status = 'TODO') {
     document.getElementById('task-id').value = '';
     currentModalGroupId = null;
     currentModalTaskId = null;
+    commentsLoaded = false;
+    document.getElementById('comments-list').innerHTML = '';
+    const commentsBadge = document.getElementById('modal-comments-badge');
+    if (commentsBadge) commentsBadge.classList.add('hidden');
     resetModalTabs();
 
     // Reset subtasks
@@ -101,6 +108,14 @@ function openTaskModal(task = null, status = 'TODO') {
             assignedSelect.value = task.assignedUserId;
         }
 
+        // Aba Mensagens: visível para tickets (têm solicitante) ou qualquer tarefa
+        const tabMensagens = document.getElementById('modal-tab-mensagens');
+        if (tabMensagens) tabMensagens.classList.remove('hidden');
+
+        // Input de comentário apenas para dev team
+        const commentInputArea = document.getElementById('comment-input-area');
+        if (commentInputArea) commentInputArea.classList.toggle('hidden', !isDevTeam);
+
         deleteBtn.classList.remove('hidden');
         deleteBtn.onclick = () => confirmDeleteTask(task.id);
 
@@ -122,6 +137,10 @@ function openTaskModal(task = null, status = 'TODO') {
 
         const assignedSelect = document.getElementById('task-assigned-user');
         if (assignedSelect) assignedSelect.value = '';
+
+        // Esconde aba Mensagens ao criar nova tarefa
+        const tabMensagens = document.getElementById('modal-tab-mensagens');
+        if (tabMensagens) tabMensagens.classList.add('hidden');
     }
 
     loadBoardMembersInModal();
@@ -398,10 +417,111 @@ function escapeHtml(str) {
 // ─── Abas internas do modal ───────────────────────────────────────────────────
 
 document.addEventListener('click', (e) => {
-    const tab = e.target.closest('#modal-tab-principal, #modal-tab-detalhes, #modal-tab-atribuicao');
+    const tab = e.target.closest('#modal-tab-principal, #modal-tab-detalhes, #modal-tab-atribuicao, #modal-tab-mensagens');
     if (!tab) return;
     const name = tab.id.replace('modal-tab-', '');
     switchModalTab(name);
+});
+
+// ─── Comentários ──────────────────────────────────────────────────────────────
+
+let commentsLoaded = false;
+
+async function loadComments(taskId) {
+    if (commentsLoaded) return;
+    commentsLoaded = true;
+
+    const list = document.getElementById('comments-list');
+    const empty = document.getElementById('comments-empty');
+    const loading = document.getElementById('comments-loading');
+    if (!list) return;
+
+    if (loading) loading.classList.remove('hidden');
+    list.innerHTML = '';
+    if (empty) empty.classList.add('hidden');
+
+    try {
+        const comments = await DevDeck.fetchApi(`/tasks/${taskId}/comments`);
+        if (loading) loading.classList.add('hidden');
+
+        const badge = document.getElementById('modal-comments-badge');
+
+        if (!comments || comments.length === 0) {
+            if (empty) empty.classList.remove('hidden');
+            if (badge) badge.classList.add('hidden');
+            return;
+        }
+
+        if (badge) {
+            badge.textContent = comments.length;
+            badge.classList.remove('hidden');
+        }
+
+        comments.forEach(c => list.appendChild(renderComment(c)));
+        list.scrollTop = list.scrollHeight;
+    } catch (e) {
+        if (loading) loading.classList.add('hidden');
+        console.error('Erro ao carregar comentários:', e);
+    }
+}
+
+function renderComment(c) {
+    const div = document.createElement('div');
+    div.className = 'p-3 rounded-lg bg-[#1c1c1c] border border-[#2a2a2a]';
+    const date = new Date(c.createdAt);
+    const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    div.innerHTML = `
+        <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-semibold text-white">${escapeHtml(c.authorName)}</span>
+            <span class="text-[10px] text-[#555555]">${dateStr}</span>
+        </div>
+        <p class="text-sm text-[#cccccc] leading-relaxed whitespace-pre-wrap">${escapeHtml(c.content)}</p>
+    `;
+    return div;
+}
+
+document.addEventListener('click', async (e) => {
+    if (!e.target.closest('#send-comment-btn')) return;
+
+    const btn = document.getElementById('send-comment-btn');
+    const textarea = document.getElementById('comment-text');
+    const content = textarea?.value.trim();
+    if (!content || !currentModalTaskId) return;
+
+    btn.disabled = true;
+    btn.querySelector('svg')?.classList.add('hidden');
+    btn.childNodes[btn.childNodes.length - 1].textContent = ' Enviando...';
+
+    try {
+        const comment = await DevDeck.fetchApi(`/tasks/${currentModalTaskId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ content })
+        });
+
+        textarea.value = '';
+        const list = document.getElementById('comments-list');
+        const empty = document.getElementById('comments-empty');
+        if (empty) empty.classList.add('hidden');
+        if (list) {
+            list.appendChild(renderComment(comment));
+            list.scrollTop = list.scrollHeight;
+        }
+
+        const badge = document.getElementById('modal-comments-badge');
+        if (badge) {
+            const count = (parseInt(badge.textContent) || 0) + 1;
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+        }
+
+        DevDeck.showAlert('Mensagem enviada! O solicitante foi notificado por email.', 'Enviado');
+    } catch (err) {
+        DevDeck.showAlert('Erro ao enviar: ' + err.message, 'Erro');
+    } finally {
+        btn.disabled = false;
+        btn.querySelector('svg')?.classList.remove('hidden');
+        btn.childNodes[btn.childNodes.length - 1].textContent = ' Enviar';
+    }
 });
 
 window.openTaskModal = openTaskModal;

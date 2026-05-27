@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { TaskService } from './task.service';
 import {
   CreateTaskDto,
+  CreateCommentDto,
   CreateEmployeeTicketDto,
   UpdateTaskDto,
   CreateSubtaskDto,
@@ -118,6 +119,23 @@ export class TaskController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.taskService.remove(+id);
+  }
+
+  // Comments
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/comments')
+  getComments(@Param('id') id: string) {
+    return this.taskService.getComments(+id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/comments')
+  addComment(
+    @Param('id') id: string,
+    @Body() dto: CreateCommentDto,
+    @Req() req,
+  ) {
+    return this.taskService.addComment(+id, req.user.userId, dto);
   }
 
   // Subtasks

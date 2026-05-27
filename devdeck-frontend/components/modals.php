@@ -11,6 +11,10 @@
             <button type="button" id="modal-tab-principal" class="modal-inner-tab modal-inner-tab-active px-4 py-2 text-sm font-medium">Principal</button>
             <button type="button" id="modal-tab-detalhes" class="modal-inner-tab px-4 py-2 text-sm font-medium">Detalhes</button>
             <button type="button" id="modal-tab-atribuicao" class="modal-inner-tab px-4 py-2 text-sm font-medium">Atribuição</button>
+            <button type="button" id="modal-tab-mensagens" class="modal-inner-tab px-4 py-2 text-sm font-medium hidden">
+                Mensagens
+                <span id="modal-comments-badge" class="ml-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-[#2a2a2a] text-[10px] text-[#888888] hidden"></span>
+            </button>
         </div>
 
         <form id="task-form">
@@ -133,6 +137,38 @@
                 </div>
 
             </div><!-- /modal-panel-atribuicao -->
+
+            <!-- ── ABA MENSAGENS ── -->
+            <div id="modal-panel-mensagens" class="hidden">
+
+                <div id="comments-loading" class="flex items-center justify-center py-8 text-[#555555] text-sm hidden">
+                    Carregando mensagens...
+                </div>
+
+                <div id="comments-list" class="space-y-3 max-h-56 overflow-y-auto mb-4 pr-1 scroll-smooth"></div>
+
+                <div id="comments-empty" class="text-center py-6 text-[#444444] text-sm hidden">
+                    Nenhuma mensagem ainda.
+                </div>
+
+                <!-- Input apenas para dev team -->
+                <div id="comment-input-area" class="hidden mt-3 pt-3 border-t border-[#2a2a2a]">
+                    <label class="block text-xs font-medium text-[#888888] mb-1.5">Nova mensagem para o solicitante</label>
+                    <textarea id="comment-text" rows="3" maxlength="2000"
+                        placeholder="Escreva uma atualização, dúvida ou confirmação de conclusão..."
+                        class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded-lg p-3 text-white placeholder-[#444444] text-sm focus:border-white focus:outline-none resize-none"></textarea>
+                    <div class="flex justify-end mt-2">
+                        <button type="button" id="send-comment-btn"
+                            class="bg-white hover:bg-[#e0e0e0] text-black text-sm font-semibold py-2 px-5 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                            Enviar
+                        </button>
+                    </div>
+                </div>
+
+            </div><!-- /modal-panel-mensagens -->
 
             <div class="flex justify-end gap-3 pt-4 mt-4 border-t border-[#2a2a2a]">
                 <button type="button" id="modal-cancel" class="px-4 py-2 text-[#888888] hover:text-white transition-colors">Cancelar</button>

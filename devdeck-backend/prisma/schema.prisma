@@ -25,6 +25,7 @@ model User {
   groupsOwned        Group[]       @relation("groupOwner")
   assignedTickets    Ticket[]
   requestedTickets   Ticket[]      @relation("requester")
+  ticketComments     TicketComment[]
 
   @@map("users")
 }
@@ -105,6 +106,7 @@ model Ticket {
   category           String?
   attachments        String?
   subtasks           Subtask[]
+  comments           TicketComment[]
   assignedUser       User?     @relation(fields: [assignedUserId], references: [id])
   requester          User?     @relation("requester", fields: [requesterUserId], references: [id])
   board              Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -126,4 +128,19 @@ model Subtask {
 
   @@index([ticketId], map: "subtasks_ticketId_fkey")
   @@map("subtasks")
+}
+
+model TicketComment {
+  id         Int      @id @default(autoincrement())
+  ticketId   Int
+  userId     Int?
+  authorName String
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@map("ticket_comments")
 }

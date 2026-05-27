@@ -143,6 +143,12 @@ export class UpdateTaskDto {
   requiresValidation?: boolean;
 }
 
+export class CreateCommentDto {
+  @IsString()
+  @IsNotEmpty()
+  content: string;
+}
+
 // Mantive Subtasks igual
 export class CreateSubtaskDto {
   @IsString()

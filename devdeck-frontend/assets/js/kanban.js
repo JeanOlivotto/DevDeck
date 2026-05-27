@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         setupGlobalClicks();
         initTabs();
+        initPusher();
 
     } catch (error) {
         console.error('ERRO CRÍTICO NO KANBAN:', error);
@@ -140,15 +141,29 @@ function switchTab(tab, updateHash = true) {
 
     validTabs.forEach(t => {
         document.getElementById(`panel-${t}`)?.classList.add('hidden');
-        document.getElementById(`tab-${t}`)?.classList.remove('tab-active');
+        const tabEl = document.getElementById(`tab-${t}`);
+        if (tabEl) {
+            tabEl.classList.remove('tab-active');
+        }
     });
 
     document.getElementById(`panel-${tab}`)?.classList.remove('hidden');
-    document.getElementById(`tab-${tab}`)?.classList.add('tab-active');
+    const activeTabEl = document.getElementById(`tab-${tab}`);
+    if (activeTabEl) {
+        activeTabEl.classList.add('tab-active');
+        activeTabEl.removeAttribute('data-has-updates');
+    }
 
     if (tab === 'kanban') loadPersonalTasks();
     else if (tab === 'coletivo') loadCollectiveTasks();
     else if (tab === 'historico') loadHistory();
+}
+
+function updateTabBadge(tab, count) {
+    const badge = document.getElementById(`badge-${tab}`);
+    if (!badge) return;
+    badge.textContent = count;
+    badge.classList.toggle('hidden', count === 0);
 }
 
 // ─── Meu Kanban ──────────────────────────────────────────────────────────
@@ -168,6 +183,7 @@ async function loadPersonalTasks() {
     todoCol.innerHTML = '';
     doingCol.innerHTML = '';
     validatingCol.innerHTML = '';
+    updateTabBadge('kanban', (tasks || []).length);
 
     const hasValidating = (tasks || []).some(t => t.requiresValidation && t.status === 'DOING');
 
@@ -268,6 +284,42 @@ function createPersonalTaskCard(task) {
         }
     }
 
+    // Priority badge + due date row
+    const priorityLabels = { URGENT: 'Urgente', HIGH: 'Alta', MEDIUM: null, LOW: 'Baixa' };
+    const priorityStyles = {
+        URGENT: 'background:rgba(122,30,30,0.3);color:#ff8080;border-color:rgba(122,30,30,0.5)',
+        HIGH:   'background:rgba(90,58,0,0.3);color:#ffaa40;border-color:rgba(90,58,0,0.5)',
+        LOW:    'background:rgba(30,58,42,0.3);color:#5aaa7a;border-color:rgba(30,58,42,0.5)',
+    };
+    const pLabel = priorityLabels[task.priority];
+    const pStyle = priorityStyles[task.priority];
+
+    let dueDateBadge = '';
+    if (task.dueDate) {
+        const due = new Date(task.dueDate);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+        const diffDays = Math.round((dueDay - today) / 86400000);
+        if (diffDays < 0) {
+            dueDateBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded border" style="background:rgba(122,30,30,0.3);color:#ff8080;border-color:rgba(122,30,30,0.5)">🔴 Atrasado</span>`;
+        } else if (diffDays === 0) {
+            dueDateBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded border" style="background:rgba(176,120,0,0.2);color:#ffcc44;border-color:rgba(176,120,0,0.4)">⏰ Hoje</span>`;
+        } else if (diffDays <= 3) {
+            dueDateBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded border" style="background:rgba(90,58,0,0.3);color:#ffaa40;border-color:rgba(90,58,0,0.5)">📅 ${diffDays}d</span>`;
+        } else {
+            const d = due.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            dueDateBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555555]">📅 ${d}</span>`;
+        }
+    }
+
+    if (pLabel || dueDateBadge) {
+        innerHTML += `<div class="flex flex-wrap items-center gap-1 mt-2">
+            ${pStyle ? `<span class="text-[10px] px-1.5 py-0.5 rounded border" style="${pStyle}">${pLabel}</span>` : ''}
+            ${dueDateBadge}
+        </div>`;
+    }
+
     if (task.requiresValidation) {
         innerHTML += `<div class="mt-2">
             <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border" style="background:rgba(176,120,0,0.1);color:#b07800;border-color:rgba(176,120,0,0.3)">
@@ -348,6 +400,8 @@ async function loadCollectiveTasks() {
     col.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Carregando...</p>';
 
     const tasks = await DevDeck.fetchApi('/tasks/unassigned');
+
+    updateTabBadge('coletivo', (tasks || []).length);
 
     if (!tasks || tasks.length === 0) {
         col.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Nenhuma tarefa disponível no momento.</p>';
@@ -512,6 +566,49 @@ function formatTimeAgo(date) {
     if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}d atrás`;
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+// ─── Pusher Real-time ─────────────────────────────────────────────────────
+
+function initPusher() {
+    if (typeof Pusher === 'undefined') {
+        console.warn('Pusher não disponível, atualizações em tempo real desabilitadas.');
+        return;
+    }
+
+    const pusher = new Pusher('c4f7fea1d37fea1c1c73', { cluster: 'us2' });
+    const channel = pusher.subscribe('devdeck-tickets');
+
+    let refreshTimer = null;
+
+    function onTicketEvent(data) {
+        const activeTab = (window.location.hash.replace('#', '') || 'kanban');
+
+        // Mark inactive tab buttons with a pending indicator
+        ['kanban', 'coletivo'].forEach(tab => {
+            if (tab !== activeTab) {
+                const tabEl = document.getElementById(`tab-${tab}`);
+                if (tabEl) tabEl.setAttribute('data-has-updates', 'true');
+            }
+        });
+
+        // Debounce refresh of the active tab
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => {
+            if (activeTab === 'kanban') {
+                loadPersonalTasks();
+            } else if (activeTab === 'coletivo') {
+                loadCollectiveTasks();
+            } else if (activeTab === 'historico') {
+                historyData = null;
+                loadHistory();
+            }
+        }, 800);
+    }
+
+    channel.bind('ticket.created', onTicketEvent);
+    channel.bind('ticket.updated', onTicketEvent);
+    channel.bind('ticket.deleted', onTicketEvent);
 }
 
 // ─── Compatibilidade / Exports ─────────────────────────────────────────

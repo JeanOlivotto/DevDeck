@@ -15,8 +15,8 @@ $pageTitle = 'BJGROUP Suporte - Dashboard';
 
     <!-- Barra de Abas -->
     <div id="tab-bar" class="flex items-center border-b border-[#2a2a2a] mb-6">
-        <button id="tab-kanban" class="tab-btn tab-active" data-tab="kanban">Meu Kanban</button>
-        <button id="tab-coletivo" class="tab-btn" data-tab="coletivo">Kanban Coletivo</button>
+        <button id="tab-kanban" class="tab-btn tab-active" data-tab="kanban">Meu Kanban <span id="badge-kanban" class="tab-badge hidden">0</span></button>
+        <button id="tab-coletivo" class="tab-btn" data-tab="coletivo">Kanban Coletivo <span id="badge-coletivo" class="tab-badge hidden">0</span></button>
         <button id="tab-historico" class="tab-btn" data-tab="historico">Histórico</button>
         <div class="ml-auto pb-1">
             <button id="manage-boards-btn" class="text-xs text-[#555555] hover:text-white border border-[#2a2a2a] hover:border-[#555555] px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
@@ -106,6 +106,7 @@ $pageTitle = 'BJGROUP Suporte - Dashboard';
 
 <?php include __DIR__ . '/../components/modals.php'; ?>
 
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 <script src="<?php echo url('assets/js/component-updates.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban.js'); ?>"></script>
 <script src="<?php echo url('assets/js/kanban-modals.js'); ?>"></script>
