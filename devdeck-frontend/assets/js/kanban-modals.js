@@ -12,8 +12,18 @@ function resetModalTabs() {
 
 function switchModalTab(name) {
     MODAL_TABS.forEach(t => {
-        document.getElementById(`modal-panel-${t}`)?.classList.toggle('hidden', t !== name);
+        const panel = document.getElementById(`modal-panel-${t}`);
         document.getElementById(`modal-tab-${t}`)?.classList.toggle('modal-inner-tab-active', t === name);
+        if (t === name) {
+            panel?.classList.remove('hidden');
+            if (panel) {
+                panel.classList.remove('animate-fade-in-up');
+                void panel.offsetWidth;
+                panel.classList.add('animate-fade-in-up');
+            }
+        } else {
+            panel?.classList.add('hidden');
+        }
     });
     if (name === 'mensagens' && currentModalTaskId) {
         loadComments(currentModalTaskId);
@@ -44,6 +54,14 @@ function openTaskModal(task = null, status = 'TODO') {
     const isDevTeam = userData?.isDevTeam === true || userData?.isDevTeam === 'true' || userData?.isDevTeam === 1;
     const subtasksSection = document.getElementById('subtasks-section');
     if (subtasksSection) subtasksSection.classList.toggle('hidden', !isDevTeam);
+
+    // Aviso de tarefa pessoal: só para novas tarefas em board pessoal
+    const personalWarning = document.getElementById('personal-task-warning');
+    if (personalWarning) {
+        const isNewTask = !task;
+        const isPersonalBoard = typeof currentBoardIsGroup !== 'undefined' && !currentBoardIsGroup;
+        personalWarning.classList.toggle('hidden', !(isNewTask && isPersonalBoard));
+    }
 
     const badge = document.getElementById('modal-category-badge');
 

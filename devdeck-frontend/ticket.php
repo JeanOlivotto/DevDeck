@@ -2,6 +2,8 @@
 require_once __DIR__ . '/config/config.php';
 $token = $_GET['token'] ?? '';
 $embedded = isset($_GET['embedded']) && $_GET['embedded'] == '1';
+$prefillName = trim($_GET['name'] ?? '');
+$prefillEmail = trim($_GET['email'] ?? '');
 ?>
 <?php if (!$embedded): ?>
 <!DOCTYPE html>
@@ -171,8 +173,24 @@ $embedded = isset($_GET['embedded']) && $_GET['embedded'] == '1';
 const API_URL = '<?php echo API_BASE_URL; ?>';
 const TOKEN = '<?php echo htmlspecialchars($token, ENT_QUOTES); ?>';
 const EMBEDDED = <?php echo $embedded ? 'true' : 'false'; ?>;
+const PREFILL_NAME = '<?php echo htmlspecialchars($prefillName, ENT_QUOTES); ?>';
+const PREFILL_EMAIL = '<?php echo htmlspecialchars($prefillEmail, ENT_QUOTES); ?>';
 let selectedCategory = null;
 let selectedFiles = [];
+
+// Pre-fill identity fields if passed via URL
+if (PREFILL_NAME) {
+    document.getElementById('inp-name').value = PREFILL_NAME;
+    document.getElementById('inp-name').readOnly = true;
+    document.getElementById('inp-name').style.opacity = '0.6';
+    document.getElementById('inp-name').style.cursor = 'default';
+}
+if (PREFILL_EMAIL) {
+    document.getElementById('inp-email').value = PREFILL_EMAIL;
+    document.getElementById('inp-email').readOnly = true;
+    document.getElementById('inp-email').style.opacity = '0.6';
+    document.getElementById('inp-email').style.cursor = 'default';
+}
 
 // Validate token on load
 fetch(`${API_URL}/boards/public/${TOKEN}`)
@@ -193,6 +211,8 @@ function selectCategory(el) {
 }
 
 function goToStep(n) {
+    // Skip step 2 if name and email are pre-filled
+    if (n === 2 && PREFILL_NAME && PREFILL_EMAIL) { n = 3; }
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     document.getElementById('step-' + n).classList.add('active');
     document.querySelectorAll('.dot').forEach((d, i) => {

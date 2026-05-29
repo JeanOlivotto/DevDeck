@@ -13,6 +13,7 @@ function getCategoryStyle(cat) {
 window.getCategoryStyle = getCategoryStyle;
 
 let currentBoardId = null;
+let currentBoardIsGroup = false;
 let allBoards = [];
 let draggedTaskElement = null;
 let historyData = null; // cache do histórico, null = não carregado
@@ -97,6 +98,7 @@ async function loadPersonalBoards() {
 
     const boards = await DevDeck.fetchApi('/boards?groupId=personal');
     allBoards = boards || [];
+    currentBoardIsGroup = false;
 
     if (allBoards.length > 0) {
         currentBoardId = allBoards[0].id;
@@ -107,6 +109,7 @@ async function loadGroupBoards(groupId) {
     if (typeof currentGroupId !== 'undefined') currentGroupId = groupId;
     const boards = await DevDeck.fetchApi(`/boards?groupId=${groupId}`);
     allBoards = boards || [];
+    currentBoardIsGroup = true;
     if (allBoards.length > 0) currentBoardId = allBoards[0].id;
 }
 
@@ -393,6 +396,8 @@ function setupPersonalDragAndDrop() {
 
 // ─── Kanban Coletivo ─────────────────────────────────────────────────────
 
+let collectiveTasksCache = [];
+
 async function loadCollectiveTasks() {
     const col = document.getElementById('collective-available-tasks');
     if (!col) return;
@@ -405,11 +410,63 @@ async function loadCollectiveTasks() {
 
     if (!tasks || tasks.length === 0) {
         col.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Nenhuma tarefa disponível no momento.</p>';
+        renderCollectiveFilters([]);
+        return;
+    }
+
+    collectiveTasksCache = tasks;
+    renderCollectiveFilters(tasks);
+
+    col.innerHTML = '';
+    tasks.forEach(task => col.appendChild(createCollectiveTaskCard(task)));
+}
+
+function getTaskCompany(task) {
+    return task.requester?.company || task.board?.group?.name || null;
+}
+
+function renderCollectiveFilters(tasks) {
+    const bar = document.getElementById('collective-filter-bar');
+    if (!bar) return;
+
+    const companies = [...new Set(tasks.map(getTaskCompany).filter(Boolean))].sort();
+
+    if (companies.length === 0) {
+        bar.classList.add('hidden');
+        return;
+    }
+
+    bar.innerHTML = `<button class="collective-filter-btn active" data-group="all" onclick="applyCollectiveFilter('all', this)">Todos</button>`;
+    companies.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'collective-filter-btn';
+        btn.dataset.group = c;
+        btn.textContent = c;
+        btn.onclick = function () { applyCollectiveFilter(c, this); };
+        bar.appendChild(btn);
+    });
+
+    bar.classList.remove('hidden');
+}
+
+function applyCollectiveFilter(group, btn) {
+    document.querySelectorAll('.collective-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const col = document.getElementById('collective-available-tasks');
+    if (!col) return;
+
+    const filtered = group === 'all'
+        ? collectiveTasksCache
+        : collectiveTasksCache.filter(t => getTaskCompany(t) === group);
+
+    if (filtered.length === 0) {
+        col.innerHTML = '<p class="text-sm text-[#444444] text-center py-8 col-span-full">Nenhuma tarefa neste projeto.</p>';
         return;
     }
 
     col.innerHTML = '';
-    tasks.forEach(task => col.appendChild(createCollectiveTaskCard(task)));
+    filtered.forEach(task => col.appendChild(createCollectiveTaskCard(task)));
 }
 
 function createCollectiveTaskCard(task) {
@@ -630,6 +687,7 @@ window.loadGroupBoards = loadGroupBoards;
 window.loadTasks = loadTasks;
 window.loadPersonalTasks = loadPersonalTasks;
 window.loadCollectiveTasks = loadCollectiveTasks;
+window.applyCollectiveFilter = applyCollectiveFilter;
 window.loadHistory = loadHistory;
 window.handleDeleteBoard = handleDeleteBoard;
 window.pickupTask = pickupTask;

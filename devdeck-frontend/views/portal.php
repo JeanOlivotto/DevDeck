@@ -258,7 +258,7 @@ body { padding: 0 !important; }
 <!-- Ticket Modal -->
 <div id="ticket-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="modal-overlay absolute inset-0" id="modal-backdrop"></div>
-    <div class="relative w-full max-w-lg bg-[#111111] rounded-2xl border border-[#2a2a2a] shadow-2xl overflow-hidden">
+    <div id="ticket-modal-inner" class="relative w-full max-w-lg bg-[#111111] rounded-2xl border border-[#2a2a2a] shadow-2xl overflow-hidden">
 
         <!-- Progress Bar -->
         <div class="h-0.5 bg-gray-800">

@@ -5,6 +5,14 @@ import { EmailService } from '../email/email.service';
 import { DiscordService } from '../discord/discord.service';
 import { User } from '@prisma/client';
 
+const STATUS_LABEL: Record<string, string> = {
+  TODO: '📝 TODO',
+  DOING: '🔄 Em Andamento',
+  DONE: '✅ Concluído',
+};
+
+const STATUS_ORDER = ['DOING', 'TODO', 'DONE'];
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
@@ -81,24 +89,41 @@ export class NotificationService {
             .catch((e) => this.logger.error(`Erro email ${user.email}`, e));
         }
 
-        // Envia para Discord - uma notificação por board no canal configurado
+        // Envia para Discord - apenas boards coletivos, tickets sem responsável
         for (const [boardId, tasks] of tasksByBoard.entries()) {
           const board = tasks[0].board;
 
-          if (board.discordWebhook) {
-            let discordText = `**📋 ${board.name}** - Resumo de Tarefas\n\n`;
-            discordText += `**${tasks.length}** tarefa(s) pendente(s):\n`;
+          if (!board.discordWebhook || board.type !== 'group') continue;
 
-            tasks.forEach((task) => {
-              discordText += `• ${task.title} (${task.status})\n`;
-            });
+          const unassigned = tasks.filter(
+            (t) => t.assignedUserId === null && t.status !== 'DONE',
+          );
 
-            this.discordService
-              .sendNotification(board.discordWebhook, discordText)
-              .catch((e) =>
-                this.logger.error(`Erro Discord board ${board.name}`, e),
-              );
-          }
+          if (unassigned.length === 0) continue;
+
+          const ticketList = unassigned
+            .map((t) => `• ${t.title}`)
+            .join('\n')
+            .slice(0, 1024);
+
+          this.discordService
+            .sendEmbed(board.discordWebhook, {
+              title: `📢 ${board.name} — Tickets Disponíveis`,
+              description: 'Os tickets abaixo ainda não têm responsável. Alguém pode pegar!',
+              color: 0x5865f2,
+              fields: [
+                {
+                  name: `🎫 Sem responsável (${unassigned.length})`,
+                  value: ticketList,
+                  inline: false,
+                },
+              ],
+              footer: { text: `${unassigned.length} ticket(s) aguardando atribuição` },
+              timestamp: new Date().toISOString(),
+            })
+            .catch((e) =>
+              this.logger.error(`Erro Discord board ${board.name}`, e),
+            );
         }
       }
     }
@@ -186,15 +211,20 @@ export class NotificationService {
       const board = tasks[0].board;
 
       if (board.discordWebhook) {
-        let discordText = `⚠️ **Alerta - ${board.name}**\n\n`;
-        discordText += `**${tasks.length}** tarefa(s) parada(s) há mais de 2 dias:\n`;
-
-        tasks.forEach((task) => {
-          discordText += `• ${task.title}\n`;
-        });
+        const taskList = tasks
+          .map((t) => `• ${t.title}`)
+          .join('\n')
+          .slice(0, 1024);
 
         this.discordService
-          .sendNotification(board.discordWebhook, discordText)
+          .sendEmbed(board.discordWebhook, {
+            title: `⚠️ Tarefas Paradas — ${board.name}`,
+            description: `**${tasks.length}** tarefa(s) em **DOING** sem atualização há mais de 2 dias:`,
+            color: 0xffa500,
+            fields: [{ name: '🔄 Em Andamento', value: taskList }],
+            footer: { text: 'Revise e mova ou atualize as tarefas.' },
+            timestamp: new Date().toISOString(),
+          })
           .catch((e) =>
             this.logger.error(`Erro Discord stale board ${board.name}`, e),
           );
@@ -207,5 +237,64 @@ export class NotificationService {
         data: { updatedAt: new Date() },
       });
     }
+  }
+
+  async testDiscordWebhooks(): Promise<string[]> {
+    const boards = await this.prisma.board.findMany({
+      where: {
+        type: 'group',
+        discordWebhook: { not: null },
+        NOT: { discordWebhook: '' },
+      },
+      include: {
+        tickets: {
+          where: { status: { not: 'DONE' }, assignedUserId: null },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+    this.logger.log(`testDiscordWebhooks: ${boards.length} board(s) coletivo(s) com webhook.`);
+
+    const sent: string[] = [];
+
+    for (const board of boards) {
+      if (!board.discordWebhook) continue;
+
+      const unassigned = board.tickets;
+
+      if (unassigned.length === 0) {
+        await this.discordService.sendEmbed(board.discordWebhook, {
+          title: `📢 ${board.name} — Tickets Disponíveis`,
+          description: 'Nenhum ticket sem responsável no momento. 🎉',
+          color: 0x57f287,
+          footer: { text: 'DevDeck · teste de webhook' },
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        const ticketList = unassigned
+          .map((t) => `• ${t.title}`)
+          .join('\n')
+          .slice(0, 1024);
+
+        await this.discordService.sendEmbed(board.discordWebhook, {
+          title: `📢 ${board.name} — Tickets Disponíveis`,
+          description: 'Os tickets abaixo ainda não têm responsável. Alguém pode pegar!',
+          color: 0x5865f2,
+          fields: [
+            {
+              name: `🎫 Sem responsável (${unassigned.length})`,
+              value: ticketList,
+              inline: false,
+            },
+          ],
+          footer: { text: `${unassigned.length} ticket(s) aguardando atribuição · teste de webhook` },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      sent.push(board.name);
+    }
+
+    return sent;
   }
 }

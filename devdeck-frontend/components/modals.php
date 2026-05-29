@@ -38,6 +38,16 @@
                     </div>
                 </div>
 
+                <!-- Aviso: tarefa pessoal só visível para o criador -->
+                <div id="personal-task-warning" class="hidden mb-4 flex items-start gap-2.5 bg-amber-950/40 border border-amber-800/40 rounded-lg px-3.5 py-3">
+                    <svg class="w-4 h-4 text-amber-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <p class="text-xs text-amber-300 leading-relaxed">
+                        Esta tarefa ficará visível <strong>somente para você</strong> no seu Kanban pessoal. Tickets enviados pelo portal de suporte vão automaticamente para o Kanban Coletivo.
+                    </p>
+                </div>
+
                 <div class="mb-4">
                     <label for="task-description" class="block text-xs font-medium text-[#888888] mb-1">Descrição</label>
                     <textarea id="task-description" name="description" rows="5" class="w-full bg-[#1c1c1c] border border-[#2a2a2a] rounded p-2 text-white focus:border-white focus:outline-none resize-none" maxlength="2000"></textarea>

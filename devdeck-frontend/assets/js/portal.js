@@ -139,8 +139,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 
 function openTicketModal() {
     resetModal();
+    currentStep = 0;
     goToStep(1);
     document.getElementById('ticket-modal').classList.remove('hidden');
+    const inner = document.getElementById('ticket-modal-inner');
+    if (inner) {
+        inner.style.animation = 'none';
+        void inner.offsetWidth;
+        inner.style.animation = 'scaleIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both';
+    }
     document.body.style.overflow = 'hidden';
 }
 
@@ -203,6 +210,7 @@ function flashDropZone() {
 }
 
 function goToStep(step) {
+    const direction = step > currentStep ? 'forward' : 'backward';
     currentStep = step;
 
     // Update step indicators
@@ -224,10 +232,18 @@ function goToStep(step) {
     const progress = step === 1 ? 33 : step === 2 ? 66 : 100;
     document.getElementById('modal-progress').style.width = progress + '%';
 
-    // Show/hide panels
-    document.getElementById('step-1').classList.toggle('hidden', step !== 1);
-    document.getElementById('step-2').classList.toggle('hidden', step !== 2);
-    document.getElementById('step-3').classList.toggle('hidden', step !== 3);
+    // Show/hide panels with slide animation
+    const animClass = direction === 'forward' ? 'animate-slide-right' : 'animate-slide-left';
+    [1, 2, 3].forEach(s => {
+        const panel = document.getElementById(`step-${s}`);
+        if (s === step) {
+            panel.classList.remove('hidden', 'animate-slide-right', 'animate-slide-left');
+            void panel.offsetWidth;
+            panel.classList.add(animClass);
+        } else {
+            panel.classList.add('hidden');
+        }
+    });
     document.getElementById('step-success').classList.add('hidden');
 
     if (step === 2) {
@@ -269,7 +285,10 @@ async function submitTicket() {
 
         // Sucesso
         document.getElementById('step-3').classList.add('hidden');
-        document.getElementById('step-success').classList.remove('hidden');
+        const successPanel = document.getElementById('step-success');
+        successPanel.classList.remove('hidden', 'animate-fade-in-up');
+        void successPanel.offsetWidth;
+        successPanel.classList.add('animate-fade-in-up');
         document.getElementById('modal-progress').style.width = '100%';
         [1, 2, 3].forEach(s => {
             const ind = document.getElementById(`step-${s}-ind`);
@@ -310,9 +329,10 @@ async function loadMyTickets() {
         count.textContent = `${tickets.length} ticket${tickets.length !== 1 ? 's' : ''}`;
         list.innerHTML = '';
 
-        tickets.forEach(ticket => {
+        tickets.forEach((ticket, index) => {
             const row = document.createElement('div');
-            row.className = 'grid grid-cols-12 px-6 py-4 border-b border-[#2a2a2a]/40 hover:bg-white/[0.02] transition-colors items-center';
+            row.className = 'grid grid-cols-12 px-6 py-4 border-b border-[#2a2a2a]/40 hover:bg-white/[0.02] transition-colors items-center stagger-item';
+            row.style.setProperty('--i', index);
 
             const date = new Date(ticket.createdAt).toLocaleDateString('pt-BR', {
                 day: '2-digit', month: '2-digit', year: '2-digit'

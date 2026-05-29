@@ -21,4 +21,12 @@ export class NotificationController {
     await this.notificationService.handleStaleTasks();
     return { message: 'Verificação de tarefas paradas disparada!' };
   }
+
+  // Dispara embed de teste para todos os boards com webhook cadastrado
+  @UseGuards(JwtAuthGuard)
+  @Post('test/discord')
+  async testDiscord() {
+    const sent = await this.notificationService.testDiscordWebhooks();
+    return { message: `Embed enviado para ${sent.length} board(s).`, boards: sent };
+  }
 }

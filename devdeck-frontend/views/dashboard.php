@@ -79,6 +79,11 @@ $pageTitle = 'BJGROUP Suporte - Dashboard';
             <p class="text-sm text-[#555555]">Tarefas disponíveis dos seus grupos — clique em "Pegar Tarefa" para assumir</p>
         </div>
 
+        <div id="collective-filter-bar" class="hidden flex flex-wrap gap-2 mb-4">
+            <button class="collective-filter-btn active" data-group="all"
+                onclick="applyCollectiveFilter('all', this)">Todos</button>
+        </div>
+
         <div class="bg-[#141414] border border-[#2a2a2a] rounded-xl p-4">
             <h3 class="column-header text-sm font-semibold mb-4 tracking-widest uppercase text-[#888888]">Disponíveis</h3>
             <div id="collective-available-tasks" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 min-h-[200px]">

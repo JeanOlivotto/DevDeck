@@ -8,6 +8,9 @@
   var label = script.getAttribute('data-label') || 'Suporte';
   var position = script.getAttribute('data-position') || 'bottom-right';
   var baseUrl = (script.getAttribute('data-base-url') || script.src.replace(/\/assets\/js\/widget\.js.*/, ''));
+  var prefillName = script.getAttribute('data-name') || '';
+  var prefillEmail = script.getAttribute('data-email') || '';
+  var noBtn = script.hasAttribute('data-no-btn');
 
   if (!token) { console.warn('[BJGROUP Widget] data-token é obrigatório.'); return; }
 
@@ -33,7 +36,10 @@
 
   var frame = document.createElement('iframe');
   frame.style.cssText = 'width:100%;max-width:520px;height:660px;max-height:90vh;border:none;border-radius:16px;background:#141414;';
-  frame.src = baseUrl + '/ticket.php?token=' + encodeURIComponent(token) + '&embedded=1';
+  var frameUrl = baseUrl + '/ticket.php?token=' + encodeURIComponent(token) + '&embedded=1';
+  if (prefillName) frameUrl += '&name=' + encodeURIComponent(prefillName);
+  if (prefillEmail) frameUrl += '&email=' + encodeURIComponent(prefillEmail);
+  frame.src = frameUrl;
 
   // Close button
   var closeBtn = document.createElement('button');
@@ -74,7 +80,11 @@
     setTimeout(function () { t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 400); }, 3500);
   }
 
-  btn.onclick = openWidget;
-  document.body.appendChild(btn);
+  if (!noBtn) {
+    btn.onclick = openWidget;
+    document.body.appendChild(btn);
+  }
   document.body.appendChild(overlay);
+
+  window.BJGWidget = { open: openWidget, close: closeWidget };
 })();
